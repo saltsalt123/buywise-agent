@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+*.egg
+
+# Environment
+.env
+.env.local
+
+# Data (user-uploaded + cache)
+data/uploads/*
+data/cache/*
+data/pgdata/*
+!data/uploads/.gitkeep
+!data/cache/.gitkeep
+!data/pgdata/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Reports
+eval/reports/*.html
+eval/reports/*.md
+
+# Test / CI
+.pytest_cache/
+.coverage
+.mypy_cache/
+htmlcov/
+*.coverage.*
+
+# Logs
+*.log

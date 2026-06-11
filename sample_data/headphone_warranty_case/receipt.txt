@@ -1,0 +1,22 @@
+SONIC ELECTRONICS - SALES RECEIPT
+----------------------------------------
+Store #: 4217 - Downtown
+Date: 2025-11-10 14:32:45
+Cashier: Maria Chen
+
+Item: SoundMax Pro Wireless Headphones
+Model: SM-PRO-X1
+SKU: SMPRX1-2025-BLK
+Quantity: 1
+Unit Price: $89.99
+Total: $89.99
+
+Payment: Visa ****4242
+Auth Code: 7A3F2B
+
+Order #: ORD-2025-11-10-8921
+
+Return Policy: 30 days from purchase date
+Warranty: 1 year manufacturer warranty included
+
+Thank you for your purchase!

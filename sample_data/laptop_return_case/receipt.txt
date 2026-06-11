@@ -1,0 +1,16 @@
+TECHWORLD INC. - SALES RECEIPT
+----------------------------------------
+Date: 2026-05-15 16:20:00
+Order #: ORD-20260515-3342
+
+Item: PowerBook Pro 15"
+Model: PB-15-M3
+Serial: SN-M31542-2026
+Quantity: 1
+Unit Price: $1,299.00
+Total: $1,299.00
+
+Payment: Visa ****1234
+
+Return Policy: 14 days for laptops (unopened)
+                30 days for accessories
