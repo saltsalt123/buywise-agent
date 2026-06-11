@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BuyWise Agent — Architecture</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #020617;
+  color: #e2e8f0;
+  font-family: 'JetBrains Mono', monospace;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  padding: 40px 20px;
+}
+.container { max-width: 1200px; width: 100%; }
+
+/* Header */
+.header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+.header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #f1f5f9;
+  letter-spacing: -0.5px;
+}
+.header .pulse-dot {
+  display: inline-block;
+  width: 10px; height: 10px;
+  background: #34d399;
+  border-radius: 50%;
+  margin-right: 10px;
+  animation: pulse 2s ease-in-out infinite;
+  vertical-align: middle;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+.header .subtitle {
+  font-size: 13px;
+  color: #64748b;
+  margin-top: 8px;
+}
+.header .subtitle span {
+  color: #22d3ee;
+}
+
+/* Diagram Card */
+.diagram-card {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 16px;
+  padding: 32px;
+  margin-bottom: 32px;
+  overflow-x: auto;
+}
+.diagram-card svg {
+  display: block;
+  margin: 0 auto;
+  width: 100%;
+  height: auto;
+  max-width: 1060px;
+}
+
+/* Info Cards */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 32px;
+}
+.card {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 12px;
+  padding: 20px;
+}
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.card-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.card-dot.cyan { background: #22d3ee; }
+.card-dot.emerald { background: #34d399; }
+.card-dot.violet { background: #a78bfa; }
+.card-header h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f1f5f9;
+}
+.card ul { list-style: none; }
+.card ul li {
+  font-size: 11px;
+  color: #94a3b8;
+  padding: 4px 0;
+  line-height: 1.5;
+}
+.card ul li::before {
+  content: "•";
+  color: #475569;
+  margin-right: 8px;
+}
+
+/* Footer */
+.footer {
+  text-align: center;
+  font-size: 11px;
+  color: #475569;
+  padding-top: 8px;
+}
+
+@media (max-width: 768px) {
+  .cards-grid { grid-template-columns: 1fr; }
+  .header h1 { font-size: 22px; }
+  .diagram-card { padding: 16px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- Header -->
+<div class="header">
+  <h1><span class="pulse-dot"></span>BuyWise Agent — MVP Architecture</h1>
+  <div class="subtitle">LangGraph Multi-Agent · Warranty / Return Decision Engine · <span>Local-First</span></div>
+</div>
+
+<!-- Diagram -->
+<div class="diagram-card">
+<svg viewBox="0 0 1020 720" xmlns="http://www.w3.org/2000/svg">
+  <!-- Grid Pattern -->
+  <defs>
+    <pattern id="grid" width="30" height="30" patternUnits="userSpaceOnUse">
+      <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+    </pattern>
+    <!-- Arrowheads -->
+    <marker id="arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M 0 0 L 8 3 L 0 6 Z" fill="#64748b"/>
+    </marker>
+    <marker id="arrow-cyan" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M 0 0 L 8 3 L 0 6 Z" fill="#22d3ee"/>
+    </marker>
+  </defs>
+
+  <rect width="1020" height="720" fill="url(#grid)"/>
+
+  <!-- ====== CONNECTIONS (draw first, behind boxes) ====== -->
+
+  <!-- User → Supervisor -->
+  <line x1="510" y1="36" x2="510" y2="80" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Supervisor → Ingestion -->
+  <path d="M 510 156 L 510 170 L 320 170 L 320 190" fill="none" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Ingestion → Retrieval -->
+  <line x1="320" y1="266" x2="320" y2="296" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Retrieval → Supervisor (evidence back) -->
+  <path d="M 320 372 L 320 390 L 510 390 L 510 370" fill="none" stroke="#64748b" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+
+  <!-- Supervisor → Order Agent -->
+  <path d="M 510 156 L 510 180 L 250 180 L 250 420 L 290 420" fill="none" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="370" y="300" fill="#475569" font-size="9" text-anchor="middle">route by intent</text>
+
+  <!-- Supervisor → Policy Agent -->
+  <path d="M 510 156 L 510 180 L 510 420 L 510 420" fill="none" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Supervisor → Verifier Agent -->
+  <path d="M 640 420 L 640 156 L 510 156" fill="none" stroke="#475569" stroke-width="1" stroke-dasharray="3,3"/>
+
+  <!-- Order → Action -->
+  <line x1="390" y1="496" x2="390" y2="530" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Policy → Action -->
+  <line x1="510" y1="496" x2="510" y2="530" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Verifier → Action -->
+  <line x1="630" y1="496" x2="630" y2="530" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Action → Output -->
+  <line x1="510" y1="606" x2="510" y2="650" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+
+  <!-- ====== USER LAYER ====== -->
+
+  <!-- User icon -->
+  <rect x="460" y="12" width="100" height="30" rx="15" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1.2"/>
+  <text x="510" y="32" fill="#cbd5e1" font-size="11" font-weight="500" text-anchor="middle">👤 User Query</text>
+
+  <!-- ====== ORCHESTRATION LAYER ====== -->
+
+  <!-- Supervisor Agent -->
+  <g>
+    <!-- bg rect -->
+    <rect x="430" y="86" width="160" height="70" rx="10" fill="#0f172a" stroke="#22d3ee" stroke-width="1.5"/>
+    <rect x="430" y="86" width="160" height="70" rx="10" fill="rgba(8,51,68,0.4)"/>
+    <text x="510" y="112" fill="#22d3ee" font-size="12" font-weight="600" text-anchor="middle">Supervisor</text>
+    <text x="510" y="132" fill="#64748b" font-size="9" text-anchor="middle">Classifies intent</text>
+    <text x="510" y="146" fill="#64748b" font-size="8" text-anchor="middle">→ warranty / return</text>
+  </g>
+
+  <!-- Label: Orchestration Layer -->
+  <rect x="42" y="86" width="86" height="16" rx="4" fill="#0f172a" stroke="#1e293b" stroke-width="1"/>
+  <text x="85" y="98" fill="#64748b" font-size="8" text-anchor="middle">ORCHESTRATION</text>
+
+  <!-- ====== DATA LAYER (left side) ====== -->
+
+  <!-- Ingestion -->
+  <g>
+    <rect x="250" y="196" width="140" height="70" rx="8" fill="#0f172a" stroke="#34d399" stroke-width="1.5"/>
+    <rect x="250" y="196" width="140" height="70" rx="8" fill="rgba(6,78,59,0.4)"/>
+    <text x="320" y="222" fill="#34d399" font-size="11" font-weight="600" text-anchor="middle">📥 File Ingestion</text>
+    <text x="320" y="240" fill="#64748b" font-size="8" text-anchor="middle">TXT · CSV · EML · HTML · PDF</text>
+    <text x="320" y="254" fill="#475569" font-size="8" text-anchor="middle">Chunking + Indexing</text>
+  </g>
+
+  <!-- Retrieval -->
+  <g>
+    <rect x="250" y="302" width="140" height="70" rx="8" fill="#0f172a" stroke="#34d399" stroke-width="1.5"/>
+    <rect x="250" y="302" width="140" height="70" rx="8" fill="rgba(6,78,59,0.4)"/>
+    <text x="320" y="328" fill="#34d399" font-size="11" font-weight="600" text-anchor="middle">🔍 Keyword Search</text>
+    <text x="320" y="346" fill="#64748b" font-size="8" text-anchor="middle">BM25 + Doc-type Fallback</text>
+    <text x="320" y="360" fill="#475569" font-size="8" text-anchor="middle">Evidence Retrieval</text>
+  </g>
+
+  <rect x="42" y="196" width="66" height="16" rx="4" fill="#0f172a" stroke="#1e293b" stroke-width="1"/>
+  <text x="75" y="208" fill="#64748b" font-size="8" text-anchor="middle">DATA</text>
+
+  <!-- ====== AGENT LAYER ====== -->
+
+  <!-- Order Agent -->
+  <g>
+    <rect x="300" y="426" width="180" height="70" rx="8" fill="#0f172a" stroke="#a78bfa" stroke-width="1.5"/>
+    <rect x="300" y="426" width="180" height="70" rx="8" fill="rgba(76,29,149,0.4)"/>
+    <text x="390" y="450" fill="#a78bfa" font-size="11" font-weight="600" text-anchor="middle">📦 Order Agent</text>
+    <text x="390" y="466" fill="#64748b" font-size="8" text-anchor="middle">Purchase date · Amount · Model</text>
+    <text x="390" y="480" fill="#475569" font-size="8" text-anchor="middle">Extracts order facts</text>
+  </g>
+
+  <!-- Policy Agent -->
+  <g>
+    <rect x="420" y="426" width="180" height="70" rx="8" fill="#0f172a" stroke="#a78bfa" stroke-width="1.5"/>
+    <rect x="420" y="426" width="180" height="70" rx="8" fill="rgba(76,29,149,0.4)"/>
+    <text x="510" y="450" fill="#a78bfa" font-size="11" font-weight="600" text-anchor="middle">📋 Policy Agent</text>
+    <text x="510" y="466" fill="#64748b" font-size="8" text-anchor="middle">Warranty terms · Exceptions</text>
+    <text x="510" y="480" fill="#475569" font-size="8" text-anchor="middle">Analyses policy coverage</text>
+  </g>
+
+  <!-- Verifier Agent -->
+  <g>
+    <rect x="540" y="426" width="180" height="70" rx="8" fill="#0f172a" stroke="#a78bfa" stroke-width="1.5"/>
+    <rect x="540" y="426" width="180" height="70" rx="8" fill="rgba(76,29,149,0.4)"/>
+    <text x="630" y="450" fill="#a78bfa" font-size="11" font-weight="600" text-anchor="middle">✅ Verifier Agent</text>
+    <text x="630" y="466" fill="#64748b" font-size="8" text-anchor="middle">Cross-checks evidence</text>
+    <text x="630" y="480" fill="#475569" font-size="8" text-anchor="middle">Validates claims</text>
+  </g>
+
+  <rect x="42" y="426" width="72" height="16" rx="4" fill="#0f172a" stroke="#1e293b" stroke-width="1"/>
+  <text x="78" y="438" fill="#64748b" font-size="8" text-anchor="middle">AGENTS</text>
+
+  <!-- ====== ACTION LAYER ====== -->
+
+  <!-- Action Agent -->
+  <g>
+    <rect x="420" y="536" width="180" height="70" rx="8" fill="#0f172a" stroke="#fb923c" stroke-width="1.5"/>
+    <rect x="420" y="536" width="180" height="70" rx="8" fill="rgba(251,146,60,0.3)"/>
+    <text x="510" y="562" fill="#fb923c" font-size="11" font-weight="600" text-anchor="middle">⚡ Action Agent</text>
+    <text x="510" y="580" fill="#64748b" font-size="8" text-anchor="middle">Draft email · Checklist</text>
+    <text x="510" y="594" fill="#475569" font-size="8" text-anchor="middle">Generates actionable outputs</text>
+  </g>
+
+  <rect x="42" y="536" width="66" height="16" rx="4" fill="#0f172a" stroke="#1e293b" stroke-width="1"/>
+  <text x="75" y="548" fill="#64748b" font-size="8" text-anchor="middle">ACTION</text>
+
+  <!-- ====== OUTPUT ====== -->
+
+  <rect x="410" y="656" width="200" height="36" rx="18" fill="rgba(8,51,68,0.5)" stroke="#22d3ee" stroke-width="1.2"/>
+  <text x="510" y="679" fill="#22d3ee" font-size="11" font-weight="500" text-anchor="middle">📊 Evidence Report + Actions</text>
+
+  <!-- ====== LEGEND ====== -->
+  <g transform="translate(780, 640)">
+    <rect x="0" y="0" width="200" height="72" rx="8" fill="#0f172a" stroke="#1e293b" stroke-width="1"/>
+    <text x="12" y="16" fill="#64748b" font-size="8" font-weight="600">LEGEND</text>
+
+    <rect x="12" y="24" width="20" height="8" rx="2" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1"/>
+    <text x="38" y="32" fill="#94a3b8" font-size="8">Orchestration</text>
+
+    <rect x="12" y="36" width="20" height="8" rx="2" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1"/>
+    <text x="38" y="44" fill="#94a3b8" font-size="8">Data</text>
+
+    <rect x="12" y="48" width="20" height="8" rx="2" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1"/>
+    <text x="38" y="56" fill="#94a3b8" font-size="8">Agents</text>
+
+    <rect x="110" y="24" width="20" height="8" rx="2" fill="rgba(251,146,60,0.3)" stroke="#fb923c" stroke-width="1"/>
+    <text x="136" y="32" fill="#94a3b8" font-size="8">Action</text>
+
+    <line x1="110" y1="46" x2="130" y2="46" stroke="#64748b" stroke-width="1.5" stroke-dasharray="4,3"/>
+    <text x="136" y="50" fill="#94a3b8" font-size="8">Data flow</text>
+  </g>
+</svg>
+</div>
+
+<!-- Info Cards -->
+<div class="cards-grid">
+  <div class="card">
+    <div class="card-header">
+      <div class="card-dot cyan"></div>
+      <h3>Workflow</h3>
+    </div>
+    <ul>
+      <li>User submits query + docs → Supervisor classifies intent</li>
+      <li>File Ingestion parses all source documents</li>
+      <li>Keyword Search retrieves relevant evidence chunks</li>
+      <li>Order &amp; Policy agents extract facts</li>
+      <li>Verifier cross-checks → Action Agent drafts output</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-dot emerald"></div>
+      <h3>Tech Stack</h3>
+    </div>
+    <ul>
+      <li>Python 3.10 + LangGraph (7-node state graph)</li>
+      <li>FastAPI + Uvicorn (2 endpoints)</li>
+      <li>Pydantic V2 for state &amp; response models</li>
+      <li>In-memory keyword search (BM25 fallback)</li>
+      <li>Multi-format parsers: PDF, CSV, EML, HTML, TXT</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-dot violet"></div>
+      <h3>Eval Results</h3>
+    </div>
+    <ul>
+      <li>Evidence Recall: 0.8 (80% of gold keywords)</li>
+      <li>Forbidden Claims: 1.0 (no hallucinations)</li>
+      <li>Action Generation: 1.0 (all actions present)</li>
+      <li>Confidence Reported: 1.0</li>
+      <li>2 test cases across warranty &amp; return scenarios</li>
+    </ul>
+  </div>
+</div>
+
+<div class="footer">
+  BuyWise Agent MVP · GitHub: saltsalt123/buywise-agent · Built with LangGraph
+</div>
+
+</div>
+</body>
+</html>

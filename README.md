@@ -12,37 +12,7 @@ Upload a receipt + warranty card + policy → ask "can I still return/warranty t
 
 ## 🧠 Architecture (MVP)
 
-```
-User Query
-    │
-    ▼
-┌──────────────────┐
-│  Supervisor      │  ← classifies intent (warranty/return)
-└────────┬─────────┘
-         ▼
-┌──────────────────┐
-│  File Ingestion  │  ← parses TXT/CSV/EML/HTML → indexes chunks
-└────────┬─────────┘
-         ▼
-┌──────────────────┐
-│  Keyword Search  │  ← evidence retrieval + doc-type fallback
-└────────┬─────────┘
-         ▼
-┌──────────────────┐  ┌──────────────────┐
-│  Order Agent     │  │  Policy Agent    │
-│  (purchase date, │  │  (warranty terms,│
-│   amount, model) │  │   exceptions)    │
-└────────┬─────────┘  └────────┬─────────┘
-         └──────────┬──────────┘
-                    ▼
-┌──────────────────┐
-│  Verifier Agent  │  ← cross-checks claims against evidence
-└────────┬─────────┘
-         ▼
-┌──────────────────┐
-│  Action Agent    │  ← email draft, checklist
-└──────────────────┘
-```
+![BuyWise Agent Architecture](assets/architecture.svg)
 
 ## 🚀 Quickstart
 
@@ -66,15 +36,25 @@ make dev
 ## 📸 Demo Output
 
 ```
+  BuyWise Agent MVP — Warranty/Return Demo
+
+  📄 Source: headphone_warranty_case/
+  💬 Query:  My headphones stopped charging after 7 months.
+             Can I claim warranty?
+
+  ────────────────────────────────────────────────────────
+  📊 ANALYSIS RESULT
+  ────────────────────────────────────────────────────────
   Intent:        warranty_or_return
   Evidence used: 6 chunks
   Confidence:    1.0
 
-  Key Facts:
-    ✅ Purchase date: 2025-11-10
-    ✅ Policy exceptions found: not covered, damage caused by, unauthorized
+  📋 Key Facts:
+    ⚠️  [0.9] Intent classified as: warranty_or_return
+    ✅ [0.6] Purchase date: 2025-11-10
+    ✅ [0.7] Warranty period: 1 year
 
-  Suggested Actions:
+  📝 Suggested Actions:
     🔓 [draft_email] Draft return/refund request to merchant
     🔓 [export_report] Collect these items before contacting support
 ```
@@ -143,6 +123,7 @@ curl http://localhost:8000/health
 ```
 buywise-agent/
 ├── agent/              # LangGraph workflow + 4 specialist agents
+├── assets/             # Architecture diagram (SVG + HTML)
 │   ├── graph.py        # 7-node graph with loop guard
 │   ├── state.py        # Pydantic data models
 │   └── agents/         # supervisor, order, policy, verifier, action
