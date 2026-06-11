@@ -14,6 +14,12 @@ Upload a receipt + warranty card + policy → ask "can I still return/warranty t
 
 ![BuyWise Agent Architecture](assets/architecture.svg)
 
+## 🎬 Live Demo
+
+[![asciicast](https://asciinema.org/a/fEPSYmjBlaELIPjv.svg)](https://asciinema.org/a/fEPSYmjBlaELIPjv)
+
+*Click the image above to watch the interactive terminal demo — project structure overview + headphone warranty/return case run.*
+
 ## 🚀 Quickstart
 
 ```bash
