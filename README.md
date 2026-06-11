@@ -1,5 +1,16 @@
 # BuyWise Agent MVP 🤖🛒
 
+<p align="center">
+  <img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License">
+  <img src="https://img.shields.io/badge/framework-LangGraph-6C5CE7" alt="LangGraph">
+  <img src="https://img.shields.io/badge/framework-LangChain-00B894" alt="LangChain">
+  <img src="https://img.shields.io/badge/API-FastAPI-009485" alt="FastAPI">
+  <img src="https://img.shields.io/badge/status-MVP-yellow" alt="MVP Status">
+  <img src="https://img.shields.io/badge/PRs-welcome-brightgreen" alt="PRs Welcome">
+  <img src="https://img.shields.io/badge/commits-3-blueviolet" alt="3 Commits">
+</p>
+
 **A LangGraph multi-agent RAG assistant for warranty/return decisions — local-first, demo-ready.**
 
 ---
