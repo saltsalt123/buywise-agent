@@ -63,10 +63,16 @@ include = ["agent*", "ingestion*", "retrieval*", "eval*", "workers*", "apps*", "
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# seed_sample_data.py builds the sample corpus from triple-quoted blocks; its long
+# lines are email bodies and HTML markup. Wrapping them would insert newlines into
+# the generated files and change what the parsers receive.
+"scripts/seed_sample_data.py" = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
