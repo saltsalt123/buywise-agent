@@ -23,6 +23,13 @@ logger = logging.getLogger(__name__)
 
 _RETRIEVER: SimpleRetriever | None = None
 
+# Retrieval budget. Measured against the sample corpus: evidence recall saturates at
+# top_k=20 / max_chunks=15 (case_001 1.00, case_002 0.80) — larger budgets gave no
+# further gain. top_k is the binding constraint: at top_k=10 the candidate pool is
+# exhausted before max_chunks is ever reached, so raising max_chunks alone does nothing.
+_TOP_K = 20
+_MAX_CHUNKS = 15
+
 
 def _get_retriever() -> SimpleRetriever:
     """Singleton retriever – we load sample data once."""
@@ -156,7 +163,7 @@ def retrieve_evidence_node(state: dict) -> dict:
     pipeline = HybridRetrievalPipeline(retriever)
 
     # Primary search: keyword-relevant chunks
-    result = pipeline.retrieve(query=query, top_k=10, max_chunks=5)
+    result = pipeline.retrieve(query=query, top_k=_TOP_K, max_chunks=_MAX_CHUNKS)
 
     # Fallback: if the retriever has data but keyword search missed some
     # doc_types, pull one chunk from each underrepresented type so
@@ -165,7 +172,7 @@ def retrieve_evidence_node(state: dict) -> dict:
     all_chunks = retriever._chunks if hasattr(retriever, "_chunks") else []
     for c in all_chunks:
         dt = c.metadata.get("doc_type")
-        if dt and dt not in seen_types and len(result["chunks"]) < 8:
+        if dt and dt not in seen_types and len(result["chunks"]) < _MAX_CHUNKS:
             result["chunks"].append(c)
             seen_types.add(dt)
 

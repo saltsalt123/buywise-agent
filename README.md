@@ -73,7 +73,7 @@ make up                # web UI (3000) is NOT included — see Roadmap Phase 7
   📊 ANALYSIS RESULT
   ────────────────────────────────────────────────────────
   Intent:        warranty_or_return
-  Evidence used: 6 chunks
+  Evidence used: 15 chunks
   Confidence:    1.0
 
   📋 Key Facts:
@@ -167,7 +167,11 @@ buywise-agent/
 
 ## 🛣️ Roadmap (post-MVP)
 
-- **Phase 4**: Full pgvector + BM25 hybrid retrieval → better evidence recall
+- **Phase 4**: Full pgvector + BM25 hybrid retrieval. The in-memory retriever is
+  budget-bound, not rank-bound: it is keyword-only (`query_terms = query.split()`, no
+  stemming or stop-word removal) and a chunk that shares no term with the query scores
+  zero and is dropped. Recall was lifted from 0.60 to 0.90 by raising the measured
+  budget (`top_k=20 / max_chunks=15`); getting beyond that needs real ranking.
 - **Phase 5**: Price monitor + deadline watch agents → proactive alerts
 - **Phase 6**: Async workers (Celery) + review summarization agent
 - **Phase 7**: Web UI (Streamlit/Next.js) + real EML/PDF upload
