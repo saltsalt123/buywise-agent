@@ -38,7 +38,7 @@ async def chat(req: ChatRequest):
         result = run_workflow(req.query, req.source_dirs)
         answer = result.get("final_answer") or {}
         return ChatResponse(
-            status="complete",
+            status=answer.get("status") or "complete",
             intent=result.get("intent"),
             summary=answer.get("summary", ""),
             key_facts=answer.get("key_facts", []),

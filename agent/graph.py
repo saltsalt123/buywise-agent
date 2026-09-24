@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from typing import Any, Literal
 
-from agent.state import BuyWiseState, EvidenceChunk
+from agent.state import BuyWiseState, EvidenceChunk, IntentType
 from agent.agents.supervisor import run_supervisor
 from agent.agents.order_agent import run_order_agent
 from agent.agents.policy_agent import run_policy_agent
@@ -182,6 +182,29 @@ def decide_action_node(state: dict) -> dict:
 def final_response_node(state: dict) -> dict:
     """Node 7 – format final output."""
     answer = state.get("final_answer") or {}
+    intent = state.get("intent")
+
+    # Short-circuit path: intent recognised, but not implemented in this MVP.
+    # Prevents silently returning an unrelated warranty analysis for e.g. purchase queries.
+    if intent != IntentType.WARRANTY_RETURN.value:
+        return {
+            **state,
+            "final_answer": {
+                "status": "unsupported_intent",
+                "intent": intent,
+                "summary": (
+                    f"Intent '{intent}' was recognised, but only the warranty/return "
+                    "decision flow is implemented in this MVP. "
+                    "See README -> Roadmap (Phase 4-7) for planned support."
+                ),
+                "key_facts": [],
+                "actions": [],
+                "uncertainties": [],
+                "evidence_count": 0,
+                "overall_confidence": 0.0,
+            },
+        }
+
     return {
         **state,
         "final_answer": {
@@ -197,7 +220,10 @@ def final_response_node(state: dict) -> dict:
 def route_after_intent(
     state: dict,
 ) -> Literal["ingest_and_index", "final_response"]:
-    return "ingest_and_index"
+    """Only the warranty/return flow is implemented in this MVP (see README Roadmap)."""
+    if state.get("intent") == IntentType.WARRANTY_RETURN.value:
+        return "ingest_and_index"
+    return "final_response"
 
 
 def route_after_ingest(
@@ -243,7 +269,11 @@ def build_graph():
     workflow.add_node("final_response", final_response_node)
 
     workflow.set_entry_point("classify_intent")
-    workflow.add_edge("classify_intent", "ingest_and_index")
+    workflow.add_conditional_edges(
+        "classify_intent",
+        route_after_intent,
+        {"ingest_and_index": "ingest_and_index", "final_response": "final_response"},
+    )
     workflow.add_edge("ingest_and_index", "retrieve_evidence")
     workflow.add_edge("retrieve_evidence", "run_specialist_agents")
     workflow.add_edge("run_specialist_agents", "verify_claims")

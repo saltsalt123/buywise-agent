@@ -150,9 +150,9 @@ def _build_summary(intent: str, verified: list[Claim]) -> str:
             return "Your product appears to be within the warranty period. You can file a warranty claim. Return window may have expired."
         return "Analysis complete. Check the key facts below for warranty/return status."
     elif "purchase" in intent:
-        return "Purchase recommendation based on reviews, price, and risk analysis."
+        return "Purchase-decision analysis is not implemented in this MVP."
     elif "price" in intent:
-        return "Price monitoring has been set up."
+        return "Price monitoring is not implemented in this MVP."
     return "Analysis complete."
 
 
