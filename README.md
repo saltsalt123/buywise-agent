@@ -34,22 +34,28 @@ Upload a receipt + warranty card + policy → ask "can I still return/warranty t
 ## 🚀 Quickstart
 
 ```bash
-# 1. Install (MVP core deps only)
+# 1. Install (MVP core deps only). The Makefile uses $(PYTHON), which defaults to
+#    `python3` — activate the venv so it resolves to the project interpreter, or
+#    override per run: make demo PYTHON=python3.10
+python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
-# 2. Run the warranty demo
+# 2. Run the test suite
+make test
+
+# 3. Run the warranty demo
 make demo
 
-# 3. Try the laptop return case
+# 4. Try the laptop return case
 make demo-laptop
 
-# 4. Run eval (2 cases, 4 metrics)
+# 5. Run eval (2 cases, 4 metrics)
 make eval
 
-# 5. Start FastAPI server
+# 6. Start FastAPI server
 make dev
 
-# 6. (optional) Full stack: API + PostgreSQL + Redis via Docker
+# 7. (optional) Full stack: API + PostgreSQL + Redis via Docker
 cp .env.example .env   # docker compose requires this file to exist
 make up                # web UI (3000) is NOT included — see Roadmap Phase 7
 ```
@@ -152,9 +158,10 @@ buywise-agent/
 ├── retrieval/          # Keyword search + rerank + compress
 ├── apps/api/           # FastAPI backend (2 endpoints)
 ├── eval/               # Eval suite (2 cases, 4 metrics)
-├── sample_data/        # 2 synthetic demo cases
+├── tests/              # Pytest suite (intent, routing, ingestion parsers)
+├── sample_data/        # 3 synthetic demo cases
 ├── scripts/demo.py     # CLI demo runner
-├── docker-compose.yml  # Full stack (PostgreSQL + Redis + API + Worker)
+├── docker-compose.yml  # API + PostgreSQL + Redis (no web UI / worker — see Roadmap)
 └── Makefile
 ```
 
@@ -164,6 +171,11 @@ buywise-agent/
 - **Phase 5**: Price monitor + deadline watch agents → proactive alerts
 - **Phase 6**: Async workers (Celery) + review summarization agent
 - **Phase 7**: Web UI (Streamlit/Next.js) + real EML/PDF upload
+- **Phase 8**: Replace the keyword-based intent classifier with an LLM/embedding
+  classifier. Substring matching cannot generalise — every inflection whose stem is
+  respelled (`charging`, `broke`, `warranties`, `stopped working`) has to be listed by
+  hand, and an unseen phrasing such as *"my phone just died"* still falls through to
+  `general_qa`. The keyword list is a stop-gap, not a classifier.
 
 To install extras for later phases:
 
