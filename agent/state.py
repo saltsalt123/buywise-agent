@@ -6,10 +6,9 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime
 from enum import Enum
-from typing import Any, Literal, Optional, TypedDict
+from typing import Any, Literal, TypedDict
 
 from pydantic import BaseModel, Field
-
 
 # ── Document / Evidence Models ──────────────────────────────────────────────
 

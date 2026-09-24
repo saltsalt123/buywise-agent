@@ -4,18 +4,16 @@ BuyWise Agent MVP — LangGraph workflow (warranty/return only).
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 from typing import Any, Literal
 
-from agent.state import BuyWiseState, EvidenceChunk, IntentType
-from agent.agents.supervisor import run_supervisor
+from agent.agents.action_agent import run_action_agent
 from agent.agents.order_agent import run_order_agent
 from agent.agents.policy_agent import run_policy_agent
+from agent.agents.supervisor import run_supervisor
 from agent.agents.verifier_agent import run_verifier
-from agent.agents.action_agent import run_action_agent
+from agent.state import BuyWiseState, EvidenceChunk, IntentType
 from retrieval import HybridRetrievalPipeline, SimpleRetriever
-
 
 # ── Shared retriever (index once, search many) ────────────────────────────
 
@@ -64,11 +62,11 @@ def _parse_one_file(path: str, seen: set[str]) -> list[EvidenceChunk]:
     # in _load_sample_data, which made every one of them a NameError in here --
     # silently swallowed by the except below, so .pdf/.csv/.eml/.html files were
     # dropped without any evidence reaching the retriever.
-    from ingestion.parsers.pdf_parser import parse_pdf
+    from agent.state import hash_content
     from ingestion.parsers.csv_parser import parse_csv
     from ingestion.parsers.email_parser import parse_eml
     from ingestion.parsers.html_parser import parse_html
-    from agent.state import hash_content
+    from ingestion.parsers.pdf_parser import parse_pdf
 
     p = Path(path)
     if not p.is_file():
@@ -93,10 +91,15 @@ def _parse_one_file(path: str, seen: set[str]) -> list[EvidenceChunk]:
         elif ext == ".txt":
             # Treat .txt as a simple text source
             from datetime import datetime
-            from agent.state import SourceDocument, DocType, make_chunk_id
+
+            from agent.state import DocType, SourceDocument, make_chunk_id
 
             name = p.stem.lower()
-            doc_type = DocType.RECEIPT if "receipt" in name else DocType.WARRANTY if "warranty" in name else DocType.MANUAL
+            doc_type = (
+                DocType.RECEIPT if "receipt" in name
+                else DocType.WARRANTY if "warranty" in name
+                else DocType.MANUAL
+            )
             src = SourceDocument(
                 source_id=f"src_{fh[:12]}",
                 user_id="default",
@@ -157,7 +160,6 @@ def ingest_and_index_node(state: dict) -> dict:
 def retrieve_evidence_node(state: dict) -> dict:
     """Node 3 – retrieve evidence relevant to the user query."""
     query = state.get("user_query", "")
-    intent = state.get("intent", "")
     retriever = _get_retriever()
 
     pipeline = HybridRetrievalPipeline(retriever)

@@ -11,7 +11,9 @@ from pathlib import Path
 from agent.state import DocType, EvidenceChunk, SourceDocument, hash_content, make_chunk_id
 
 
-def parse_eml(file_path: str, user_id: str = "default") -> tuple[SourceDocument, list[EvidenceChunk]]:
+def parse_eml(
+    file_path: str, user_id: str = "default"
+) -> tuple[SourceDocument, list[EvidenceChunk]]:
     path = Path(file_path)
     raw_bytes = path.read_bytes()
     file_hash = hash_content(raw_bytes)

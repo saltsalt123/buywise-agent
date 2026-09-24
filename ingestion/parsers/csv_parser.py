@@ -19,7 +19,9 @@ from agent.state import (
 )
 
 
-def parse_csv(file_path: str, user_id: str = "default") -> tuple[SourceDocument, list[EvidenceChunk], list[ParsedObject]]:
+def parse_csv(
+    file_path: str, user_id: str = "default"
+) -> tuple[SourceDocument, list[EvidenceChunk], list[ParsedObject]]:
     path = Path(file_path)
     raw_bytes = path.read_bytes()
     file_hash = hash_content(raw_bytes)

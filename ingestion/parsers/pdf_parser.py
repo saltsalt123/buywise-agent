@@ -11,7 +11,9 @@ import pdfplumber
 from agent.state import DocType, EvidenceChunk, SourceDocument, hash_content, make_chunk_id
 
 
-def parse_pdf(file_path: str, user_id: str = "default") -> tuple[SourceDocument, list[EvidenceChunk]]:
+def parse_pdf(
+    file_path: str, user_id: str = "default"
+) -> tuple[SourceDocument, list[EvidenceChunk]]:
     """Parse a PDF file into a SourceDocument + list of EvidenceChunks."""
     path = Path(file_path)
     raw_bytes = path.read_bytes()
@@ -46,7 +48,6 @@ def parse_pdf(file_path: str, user_id: str = "default") -> tuple[SourceDocument,
         source.metadata["pages"] = len(pdf.pages)
         for page_num, page in enumerate(pdf.pages, start=1):
             text = page.extract_text() or ""
-            tables = page.extract_tables()
 
             # Split long pages into paragraph-level chunks
             paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]

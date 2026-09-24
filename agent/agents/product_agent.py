@@ -34,7 +34,10 @@ def run_product_agent(state: dict) -> dict:
         facts.specs[key.strip()] = val.strip()
 
     # Check if the user's issue is mentioned in the manual
-    issue_keywords = ["charging", "battery", "power", "overheat", "noise", "leak", "crack", "display", "button", "connect", "bluetooth", "wifi"]
+    issue_keywords = [
+        "charging", "battery", "power", "overheat", "noise", "leak",
+        "crack", "display", "button", "connect", "bluetooth", "wifi",
+    ]
     for kw in issue_keywords:
         if kw in query and kw in all_text:
             facts.known_issues.append(f"Manual mentions '{kw}' (relevant to user's issue)")
@@ -54,7 +57,10 @@ def run_product_agent(state: dict) -> dict:
         claims.append(
             Claim(
                 claim_id="product_issue_coverage",
-                text="Issue type is discussed in product documentation: " + "; ".join(facts.known_issues),
+                text=(
+                    "Issue type is discussed in product documentation: "
+                    + "; ".join(facts.known_issues)
+                ),
                 claim_type=ClaimType.POLICY_RULE,
                 confidence=0.7,
             )

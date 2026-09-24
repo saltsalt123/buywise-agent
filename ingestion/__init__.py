@@ -7,10 +7,27 @@ from pathlib import Path
 
 from agent.state import DocType, EvidenceChunk, ParsedObject, SourceDocument
 
-from .parsers.pdf_parser import parse_pdf
 from .parsers.csv_parser import parse_csv
 from .parsers.email_parser import parse_eml
 from .parsers.html_parser import parse_html
+from .parsers.pdf_parser import parse_pdf
+
+# Public surface of this package. The parsers return these state types, so they are
+# re-exported here for callers even though nothing *inside* this module references
+# DocType/ParsedObject/SourceDocument directly.
+__all__ = [
+    "SUPPORTED_EXTENSIONS",
+    "DocType",
+    "EvidenceChunk",
+    "ParsedObject",
+    "SourceDocument",
+    "chunk_text",
+    "parse_file",
+    "parse_csv",
+    "parse_eml",
+    "parse_html",
+    "parse_pdf",
+]
 
 
 SUPPORTED_EXTENSIONS = {
@@ -28,7 +45,9 @@ def parse_file(file_path: str, user_id: str = "default") -> dict:
     ext = path.suffix.lower()
 
     if ext not in SUPPORTED_EXTENSIONS:
-        raise ValueError(f"Unsupported file type: {ext}. Supported: {list(SUPPORTED_EXTENSIONS.keys())}")
+        raise ValueError(
+            f"Unsupported file type: {ext}. Supported: {list(SUPPORTED_EXTENSIONS.keys())}"
+        )
 
     parser_type, has_objects = SUPPORTED_EXTENSIONS[ext]
 
@@ -53,7 +72,9 @@ def parse_file(file_path: str, user_id: str = "default") -> dict:
     }
 
 
-def chunk_text(text: str, source_id: str, chunk_size: int = 800, overlap: int = 100) -> list[EvidenceChunk]:
+def chunk_text(
+    text: str, source_id: str, chunk_size: int = 800, overlap: int = 100
+) -> list[EvidenceChunk]:
     """Simple text chunker with overlap."""
     chunks = []
     start = 0

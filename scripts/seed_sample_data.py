@@ -3,7 +3,6 @@ Seed sample data into the data/uploads directory.
 """
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 SAMPLE_DIR = Path("sample_data")

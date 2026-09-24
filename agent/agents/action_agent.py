@@ -3,14 +3,13 @@ Action Agent - generates actionable outputs: email drafts, checklists, watch tas
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from agent.state import (
     AgentMessage,
     Claim,
     ClaimType,
     PendingAction,
-    TaskStatus,
 )
 
 
@@ -24,7 +23,9 @@ def run_action_agent(state: dict) -> dict:
 
     if "warranty" in intent or "return" in intent:
         # Generate warranty/return recommendation
-        has_warranty = any("warranty" in c.text.lower() and "year" in c.text.lower() for c in verified)
+        has_warranty = any(
+            "warranty" in c.text.lower() and "year" in c.text.lower() for c in verified
+        )
         has_return = any("return" in c.text.lower() for c in verified)
 
         if has_warranty:
@@ -35,7 +36,14 @@ def run_action_agent(state: dict) -> dict:
                     description="Draft warranty claim email to merchant/manufacturer",
                     payload={
                         "subject": "Warranty Claim Request",
-                        "body": "To Whom It May Concern,\n\nI am writing to request a warranty claim for a product purchased recently. Please find the details below.\n\n[Please attach receipt and photos]\n\nThank you,\n[Your Name]",
+                        "body": (
+                            "To Whom It May Concern,\n\n"
+                            "I am writing to request a warranty claim for a product "
+                            "purchased recently. Please find the details below.\n\n"
+                            "[Please attach receipt and photos]\n\n"
+                            "Thank you,\n"
+                            "[Your Name]"
+                        ),
                         "include_receipt": True,
                         "include_photos_of_issue": True,
                     },
@@ -50,7 +58,14 @@ def run_action_agent(state: dict) -> dict:
                     description="Draft return/refund request to merchant",
                     payload={
                         "subject": "Return Request",
-                        "body": "To Whom It May Concern,\n\nI would like to request a return for my recent purchase. Details below.\n\n[Order details]\n\nThank you,\n[Your Name]",
+                        "body": (
+                            "To Whom It May Concern,\n\n"
+                            "I would like to request a return for my recent purchase. "
+                            "Details below.\n\n"
+                            "[Order details]\n\n"
+                            "Thank you,\n"
+                            "[Your Name]"
+                        ),
                         "include_order_number": True,
                     },
                     requires_approval=False,
@@ -112,7 +127,6 @@ def run_action_agent(state: dict) -> dict:
     )
 
     # Build final answer
-    all_claims = verified + unsupported
     final_answer = {
         "summary": _build_summary(intent, verified),
         "key_facts": [
@@ -147,7 +161,10 @@ def run_action_agent(state: dict) -> dict:
 def _build_summary(intent: str, verified: list[Claim]) -> str:
     if "warranty" in intent or "return" in intent:
         if any("warranty" in c.text.lower() and "year" in c.text.lower() for c in verified):
-            return "Your product appears to be within the warranty period. You can file a warranty claim. Return window may have expired."
+            return (
+                "Your product appears to be within the warranty period. "
+                "You can file a warranty claim. Return window may have expired."
+            )
         return "Analysis complete. Check the key facts below for warranty/return status."
     elif "purchase" in intent:
         return "Purchase-decision analysis is not implemented in this MVP."

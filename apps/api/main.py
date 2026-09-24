@@ -3,8 +3,6 @@ BuyWise Agent MVP — Minimal FastAPI backend.
 """
 from __future__ import annotations
 
-from pathlib import Path
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel

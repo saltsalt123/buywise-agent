@@ -50,7 +50,12 @@ def eval_retrieval(case: EvalCase, result: dict) -> dict:
     chunk_texts = " ".join(c.text.lower() for c in result.get("retrieved_evidence", []))
     hits = sum(1 for keyword in case.gold_evidence_ids if keyword.lower() in chunk_texts)
     recall = hits / max(len(case.gold_evidence_ids), 1)
-    return {"metric": "evidence_recall", "score": round(recall, 3), "hits": hits, "total": len(case.gold_evidence_ids)}
+    return {
+        "metric": "evidence_recall",
+        "score": round(recall, 3),
+        "hits": hits,
+        "total": len(case.gold_evidence_ids),
+    }
 
 
 def eval_forbidden(case: EvalCase, result: dict) -> dict:
@@ -62,7 +67,11 @@ def eval_forbidden(case: EvalCase, result: dict) -> dict:
     ).lower()
     violations = [c for c in case.forbidden_claims if c.lower() in all_text]
     score = 1.0 - (len(violations) / max(len(case.forbidden_claims), 1))
-    return {"metric": "forbidden_claim_avoidance", "score": round(score, 3), "violations": violations}
+    return {
+        "metric": "forbidden_claim_avoidance",
+        "score": round(score, 3),
+        "violations": violations,
+    }
 
 
 def eval_actions(case: EvalCase, result: dict) -> dict:
@@ -70,7 +79,12 @@ def eval_actions(case: EvalCase, result: dict) -> dict:
     actions = result.get("final_answer", {}).get("actions", [])
     types = [a.get("type", "") for a in actions]
     hits = sum(1 for e in case.expected_actions if e in types)
-    return {"metric": "action_generation", "score": round(hits / max(len(case.expected_actions), 1), 3), "hits": hits, "total": len(case.expected_actions)}
+    return {
+        "metric": "action_generation",
+        "score": round(hits / max(len(case.expected_actions), 1), 3),
+        "hits": hits,
+        "total": len(case.expected_actions),
+    }
 
 
 def eval_confidence(result: dict) -> dict:
@@ -118,7 +132,13 @@ def run_all(output_path: str | None = None):
         except Exception as e:
             elapsed = time.time() - start
             print(f"  ❌ FAILED ({elapsed:.1f}s): {e}")
-            results.append({"case_id": case.case_id, "status": "failed", "elapsed_s": round(elapsed, 1), "error": str(e), "metrics": []})
+            results.append({
+                "case_id": case.case_id,
+                "status": "failed",
+                "elapsed_s": round(elapsed, 1),
+                "error": str(e),
+                "metrics": [],
+            })
 
     report = _format_report(results)
     print(f"\n{'='*55}")

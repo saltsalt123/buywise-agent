@@ -3,8 +3,6 @@ Supervisor Agent - intent classification and task planning.
 """
 from __future__ import annotations
 
-import re
-
 from agent.state import AgentMessage, Claim, ClaimType, IntentType
 
 
@@ -26,11 +24,23 @@ def classify_intent(query: str) -> str:
         return IntentType.WARRANTY_RETURN.value
 
     # Purchase decision keywords
-    if any(kw in q for kw in ["buy", "purchase", "which one", "recommend", "best", "compare", "between", "alternative", "worth", "vs"]):
+    if any(
+        kw in q
+        for kw in [
+            "buy", "purchase", "which one", "recommend", "best",
+            "compare", "between", "alternative", "worth", "vs",
+        ]
+    ):
         return IntentType.PURCHASE_DECISION.value
 
     # Price monitor keywords
-    if any(kw in q for kw in ["price", "drop", "monitor", "watch", "track", "notify", "alert", "deal", "discount", "sale"]):
+    if any(
+        kw in q
+        for kw in [
+            "price", "drop", "monitor", "watch", "track",
+            "notify", "alert", "deal", "discount", "sale",
+        ]
+    ):
         return IntentType.PRICE_MONITOR.value
 
     return IntentType.GENERAL_QA.value
@@ -45,7 +55,9 @@ def run_supervisor(state: dict) -> dict:
     plan = {"intent": intent, "agents_needed": [], "steps": []}
 
     if intent == IntentType.WARRANTY_RETURN.value:
-        plan["agents_needed"] = ["order_agent", "policy_agent", "product_agent", "verifier_agent", "action_agent"]
+        plan["agents_needed"] = [
+            "order_agent", "policy_agent", "product_agent", "verifier_agent", "action_agent",
+        ]
         plan["steps"] = [
             "extract_order_facts",
             "analyze_policy",
@@ -54,7 +66,9 @@ def run_supervisor(state: dict) -> dict:
             "generate_actions",
         ]
     elif intent == IntentType.PURCHASE_DECISION.value:
-        plan["agents_needed"] = ["product_agent", "review_agent", "price_agent", "risk_agent", "verifier_agent"]
+        plan["agents_needed"] = [
+            "product_agent", "review_agent", "price_agent", "risk_agent", "verifier_agent",
+        ]
         plan["steps"] = [
             "extract_product_facts",
             "summarize_reviews",

@@ -10,7 +10,6 @@ from bs4 import BeautifulSoup, Comment
 
 from agent.state import DocType, EvidenceChunk, SourceDocument, hash_content, make_chunk_id
 
-
 # Tags to remove as boilerplate
 BOILERPLATE_TAGS = [
     "script", "style", "nav", "footer", "header",
@@ -50,11 +49,13 @@ def clean_html(html: str) -> str:
         text = soup.get_text(separator="\n", strip=True)
 
     # Deduplicate empty lines
-    lines = [l.strip() for l in text.split("\n") if l.strip()]
+    lines = [line.strip() for line in text.split("\n") if line.strip()]
     return "\n".join(lines)
 
 
-def parse_html(file_path: str, user_id: str = "default") -> tuple[SourceDocument, list[EvidenceChunk]]:
+def parse_html(
+    file_path: str, user_id: str = "default"
+) -> tuple[SourceDocument, list[EvidenceChunk]]:
     path = Path(file_path)
     raw_bytes = path.read_bytes()
     file_hash = hash_content(raw_bytes)

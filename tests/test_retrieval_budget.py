@@ -14,8 +14,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from agent.graph import _MAX_CHUNKS, _TOP_K, run_workflow
 
 SAMPLE_DATA = Path(__file__).resolve().parent.parent / "sample_data"
@@ -36,7 +34,9 @@ class TestBudgetIsNotReduced:
         )
 
     def test_max_chunks_meets_measured_saturation_point(self) -> None:
-        assert _MAX_CHUNKS >= 15, f"max_chunks={_MAX_CHUNKS} is below the measured saturation point (15)"
+        assert _MAX_CHUNKS >= 15, (
+            f"max_chunks={_MAX_CHUNKS} is below the measured saturation point (15)"
+        )
 
 
 class TestGoldEvidenceReachesTheGraph:

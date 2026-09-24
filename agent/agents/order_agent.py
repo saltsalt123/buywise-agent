@@ -4,7 +4,6 @@ Order Agent - extracts purchase details from receipts/order emails/bank CSVs.
 from __future__ import annotations
 
 import re
-from datetime import datetime
 
 from agent.state import AgentMessage, Claim, ClaimType, EvidenceChunk, OrderFacts
 
@@ -64,7 +63,10 @@ def extract_product_model(text: str) -> str | None:
 def run_order_agent(state: dict) -> dict:
     """Extract order facts from evidence chunks."""
     chunks: list[EvidenceChunk] = state.get("retrieved_evidence", [])
-    order_chunks = [c for c in chunks if c.metadata.get("doc_type") in ("receipt", "email", "bank_csv")]
+    order_chunks = [
+        c for c in chunks
+        if c.metadata.get("doc_type") in ("receipt", "email", "bank_csv")
+    ]
 
     all_text = " ".join(c.text for c in order_chunks)
 

@@ -4,7 +4,7 @@ Policy Agent - analyzes warranty, return, and refund policies.
 from __future__ import annotations
 
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from agent.state import AgentMessage, Claim, ClaimType, EvidenceChunk, PolicyDecision
 
@@ -39,12 +39,16 @@ def run_policy_agent(state: dict) -> dict:
     decision = PolicyDecision()
 
     # Extract return window
-    return_match = re.search(r"return\s*(?:within|policy|window|period)[:\s]*(\d+)\s*(?:day|days)", all_text)
+    return_match = re.search(
+        r"return\s*(?:within|policy|window|period)[:\s]*(\d+)\s*(?:day|days)", all_text
+    )
     if return_match:
         decision.return_window_days = int(return_match.group(1))
 
     # Extract warranty period
-    warranty_match = re.search(r"warranty[:\s]*(\d+)\s*(?:year|years|month|months|day|days)", all_text)
+    warranty_match = re.search(
+        r"warranty[:\s]*(\d+)\s*(?:year|years|month|months|day|days)", all_text
+    )
     if warranty_match:
         decision.warranty_period = warranty_match.group(0)
         decision.confidence = 0.85
@@ -79,7 +83,9 @@ def run_policy_agent(state: dict) -> dict:
             decision.is_return_valid = days_since <= decision.return_window_days
             # Warranty is typically longer than return window
             if decision.warranty_period:
-                decision.is_warranty_valid = days_since <= parse_days(decision.warranty_period) or True
+                decision.is_warranty_valid = (
+                    days_since <= parse_days(decision.warranty_period) or True
+                )
         except (ValueError, IndexError):
             pass
 
@@ -92,7 +98,11 @@ def run_policy_agent(state: dict) -> dict:
                 text=f"Return window: {decision.return_window_days} days ({status} window)",
                 claim_type=ClaimType.POLICY_RULE,
                 confidence=decision.confidence,
-                uncertainty=None if decision.is_return_valid is not None else "Cannot determine purchase date",
+                uncertainty=(
+                    None
+                    if decision.is_return_valid is not None
+                    else "Cannot determine purchase date"
+                ),
             )
         )
     if decision.warranty_period:

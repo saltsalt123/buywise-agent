@@ -3,7 +3,7 @@ Verifier Agent - checks each claim against evidence, marks supported/unsupported
 """
 from __future__ import annotations
 
-from agent.state import AgentMessage, Claim, ClaimType
+from agent.state import AgentMessage, Claim
 
 
 def run_verifier(state: dict) -> dict:

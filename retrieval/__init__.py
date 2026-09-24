@@ -68,7 +68,9 @@ class SimpleRetriever:
 
         return exact_matches + others
 
-    def compress(self, chunks: list[EvidenceChunk], query: str, max_chunks: int = 5) -> list[EvidenceChunk]:
+    def compress(
+        self, chunks: list[EvidenceChunk], query: str, max_chunks: int = 5
+    ) -> list[EvidenceChunk]:
         """Contextual compression: keep only top-k after reranking."""
         reranked = self.rerank(chunks, query)
         return reranked[:max_chunks]

@@ -3,7 +3,6 @@ BuyWise Agent MVP — CLI demo for warranty/return scenario.
 """
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
@@ -22,7 +21,7 @@ def demo_warranty():
     case_dir = str(SAMPLE_DIR / "headphone_warranty_case")
     query = "My headphones stopped charging after 7 months. Can I claim warranty?"
 
-    print(f"  📄 Source: headphone_warranty_case/")
+    print("  📄 Source: headphone_warranty_case/")
     print(f"  💬 Query:  {query}")
     print()
 
