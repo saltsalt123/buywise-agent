@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/API-FastAPI-009485" alt="FastAPI">
   <img src="https://img.shields.io/badge/status-MVP-yellow" alt="MVP Status">
   <img src="https://img.shields.io/badge/PRs-welcome-brightgreen" alt="PRs Welcome">
-  <img src="https://img.shields.io/badge/commits-3-blueviolet" alt="3 Commits">
+  <img src="https://img.shields.io/github/last-commit/saltsalt123/buywise-agent" alt="Last Commit">
 </p>
 
 **A LangGraph multi-agent RAG assistant for warranty/return decisions — local-first, demo-ready.**
@@ -48,6 +48,10 @@ make eval
 
 # 5. Start FastAPI server
 make dev
+
+# 6. (optional) Full stack: API + PostgreSQL + Redis via Docker
+cp .env.example .env   # docker compose requires this file to exist
+make up                # web UI (3000) is NOT included — see Roadmap Phase 7
 ```
 
 ## 📸 Demo Output
@@ -139,11 +143,11 @@ curl http://localhost:8000/health
 
 ```
 buywise-agent/
-├── agent/              # LangGraph workflow + 4 specialist agents
-├── assets/             # Architecture diagram (SVG + HTML)
+├── agent/              # LangGraph workflow
 │   ├── graph.py        # 7-node graph with loop guard
 │   ├── state.py        # Pydantic data models
-│   └── agents/         # supervisor, order, policy, verifier, action
+│   └── agents/         # supervisor + 5 specialists (order, policy, product, verifier, action)
+├── assets/             # Architecture diagram (SVG + HTML)
 ├── ingestion/parsers/  # File parsers (PDF, CSV, EML, HTML, TXT)
 ├── retrieval/          # Keyword search + rerank + compress
 ├── apps/api/           # FastAPI backend (2 endpoints)
@@ -177,6 +181,7 @@ pip install -e ".[evalextra]"
 - ❌ No real-time Gmail/Amazon integration
 - ❌ No PostgreSQL/vector DB (runs with in-memory keyword search)
 - ❌ No async background workers
+- ❌ No purchase-decision flow (intent is detected, but returns `unsupported_intent`)
 - ❌ No price monitoring or review analysis
 - ❌ No web frontend (API + CLI only)
 
