@@ -13,7 +13,16 @@ def classify_intent(query: str) -> str:
     q = query.lower()
 
     # Warranty / return / refund keywords
-    if any(kw in q for kw in ["warranty", "return", "refund", "broken", "defect", "repair", "replace", "damage", "faulty", "stop working", "not working", "charge"]):
+    # NOTE: matching is a plain substring test, so an inflection whose stem is
+    # respelled (charge->charging, break->broke, warranty->warranties,
+    # stop working->stopped working) does NOT contain the base form and must be
+    # listed explicitly. "break" is intentionally included for coverage of
+    # break/breaks/breaking even though it also matches e.g. "break down".
+    if any(kw in q for kw in ["warranty", "warranties", "return", "refund", "repair",
+                              "replace", "replacing", "damage", "damaging", "broken",
+                              "broke", "break", "defect", "defective", "fault", "faulty",
+                              "stop working", "stopped working", "stops working",
+                              "not working", "charge", "charging"]):
         return IntentType.WARRANTY_RETURN.value
 
     # Purchase decision keywords
