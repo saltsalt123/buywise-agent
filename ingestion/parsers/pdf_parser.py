@@ -3,6 +3,7 @@ PDF parser - extracts text and tables from PDF documents.
 """
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 import pdfplumber
@@ -35,7 +36,7 @@ def parse_pdf(file_path: str, user_id: str = "default") -> tuple[SourceDocument,
         file_hash=file_hash,
         doc_type=doc_type,
         title=path.name,
-        created_at=path.stat().st_ctime,  # rough
+        created_at=datetime.fromtimestamp(path.stat().st_mtime),
         metadata={"file_path": str(path), "pages": 0},
     )
 

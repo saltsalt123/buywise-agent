@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import csv
 import io
+from datetime import datetime
 from pathlib import Path
 
 from agent.state import (
@@ -44,6 +45,7 @@ def parse_csv(file_path: str, user_id: str = "default") -> tuple[SourceDocument,
         file_hash=file_hash,
         doc_type=doc_type,
         title=path.name,
+        created_at=datetime.fromtimestamp(path.stat().st_mtime),
         metadata={"file_path": str(path)},
     )
 

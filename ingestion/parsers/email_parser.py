@@ -4,6 +4,7 @@ Email (.eml) parser - extracts headers and body from email files.
 from __future__ import annotations
 
 import email
+from datetime import datetime
 from email import policy
 from pathlib import Path
 
@@ -21,6 +22,7 @@ def parse_eml(file_path: str, user_id: str = "default") -> tuple[SourceDocument,
         file_hash=file_hash,
         doc_type=DocType.EMAIL,
         title=path.name,
+        created_at=datetime.fromtimestamp(path.stat().st_mtime),
         metadata={"file_path": str(path)},
     )
 

@@ -3,6 +3,7 @@ BuyWise Agent MVP — LangGraph workflow (warranty/return only).
 """
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from typing import Any, Literal
@@ -18,6 +19,8 @@ from retrieval import HybridRetrievalPipeline, SimpleRetriever
 
 # ── Shared retriever (index once, search many) ────────────────────────────
 
+logger = logging.getLogger(__name__)
+
 _RETRIEVER: SimpleRetriever | None = None
 
 
@@ -31,11 +34,6 @@ def _get_retriever() -> SimpleRetriever:
 
 def _load_sample_data(source_ids: list[str]) -> list[EvidenceChunk]:
     """Parse sample-data source dirs (or standalone files) into EvidenceChunks."""
-    from ingestion.parsers.pdf_parser import parse_pdf
-    from ingestion.parsers.csv_parser import parse_csv
-    from ingestion.parsers.email_parser import parse_eml
-    from ingestion.parsers.html_parser import parse_html
-
     all_chunks: list[EvidenceChunk] = []
     seen: set[str] = set()
 
@@ -54,6 +52,15 @@ def _load_sample_data(source_ids: list[str]) -> list[EvidenceChunk]:
 
 def _parse_one_file(path: str, seen: set[str]) -> list[EvidenceChunk]:
     """Parse a single file, skip duplicates via file-hash tracking."""
+    # These live here (not in the caller) because they are only needed when a file
+    # of the matching type is actually encountered. Previously they were imported
+    # in _load_sample_data, which made every one of them a NameError in here --
+    # silently swallowed by the except below, so .pdf/.csv/.eml/.html files were
+    # dropped without any evidence reaching the retriever.
+    from ingestion.parsers.pdf_parser import parse_pdf
+    from ingestion.parsers.csv_parser import parse_csv
+    from ingestion.parsers.email_parser import parse_eml
+    from ingestion.parsers.html_parser import parse_html
     from agent.state import hash_content
 
     p = Path(path)
@@ -105,7 +112,10 @@ def _parse_one_file(path: str, seen: set[str]) -> list[EvidenceChunk]:
             ]
         else:
             return []
-    except Exception:
+    except Exception as exc:
+        # One unreadable file must not abort ingestion, but it must not vanish
+        # silently either -- that is how the missing imports above went unnoticed.
+        logger.warning("Skipping unparseable file %s (%s): %s", path, ext, exc)
         return []
 
     for c in chunks:

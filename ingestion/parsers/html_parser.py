@@ -3,6 +3,7 @@ HTML parser - extracts clean content from product pages and policy pages.
 """
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 
 from bs4 import BeautifulSoup, Comment
@@ -74,6 +75,7 @@ def parse_html(file_path: str, user_id: str = "default") -> tuple[SourceDocument
         file_hash=file_hash,
         doc_type=doc_type,
         title=path.name,
+        created_at=datetime.fromtimestamp(path.stat().st_mtime),
         metadata={"file_path": str(path)},
     )
 
