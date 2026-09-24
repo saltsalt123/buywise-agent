@@ -170,8 +170,11 @@ buywise-agent/
 - **Phase 4**: Full pgvector + BM25 hybrid retrieval. The in-memory retriever is
   budget-bound, not rank-bound: it is keyword-only (`query_terms = query.split()`, no
   stemming or stop-word removal) and a chunk that shares no term with the query scores
-  zero and is dropped. Recall was lifted from 0.60 to 0.90 by raising the measured
-  budget (`top_k=20 / max_chunks=15`); getting beyond that needs real ranking.
+  zero and is dropped. Retrieval recall now reads 1.00: 0.60 → 0.90 came from raising the
+  measured budget (`top_k=20 / max_chunks=15`), and the last 0.10 from correcting a gold
+  keyword that never matched the data — the case asked for "May 15" while the files store
+  ISO dates (`2026-05-15`). The real ceiling is the ranking, not the budget: a query whose
+  terms never overlap a chunk still retrieves nothing.
 - **Phase 5**: Price monitor + deadline watch agents → proactive alerts
 - **Phase 6**: Async workers (Celery) + review summarization agent
 - **Phase 7**: Web UI (Streamlit/Next.js) + real EML/PDF upload

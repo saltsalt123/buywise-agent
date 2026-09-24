@@ -31,7 +31,12 @@ EVAL_CASES = [
         user_query="Can I return this laptop I bought on May 15?",
         input_sources=[f"{SAMPLE}/laptop_return_case"],
         expected_decision="return_window_analysis",
-        gold_evidence_ids=["return policy", "14 days", "May 15", "laptop", "receipt"],
+        # "May 15" is the human-readable form used in the query, but the source files
+        # store ISO dates ("Date: 2026-05-15" in receipt.txt, and bank_statement.csv).
+        # Gold keywords are substring-matched against chunk text, so a gold entry that
+        # matches the query's phrasing instead of the data's silently caps recall below
+        # 1.0 — this case read 0.8 for exactly that reason.
+        gold_evidence_ids=["return policy", "14 days", "2026-05-15", "laptop", "receipt"],
         forbidden_claims=["You can return for a full refund with no restrictions"],
         expected_actions=["draft_email"],
     ),
