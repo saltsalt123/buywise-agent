@@ -18,26 +18,10 @@ services:
       - ./retrieval:/app/retrieval
     command: uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --reload
 
-  worker:
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
-    env_file: .env
-    depends_on:
-      - db
-      - redis
-    volumes:
-      - ./data:/app/data
-    command: python -m workers.celery_app worker --loglevel=info
-
-  web:
-    image: nginx:alpine
-    ports:
-      - "3000:80"
-    volumes:
-      - ./apps/web:/usr/share/nginx/html:ro
-    depends_on:
-      - api
+  # NOTE: `worker` (Celery) and `web` (frontend) are Roadmap Phase 6 / Phase 7 items
+  # and are intentionally NOT defined here — this MVP ships API + CLI only.
+  # Re-adding `worker` requires workers/celery_app.py to exist.
+  # Re-adding `web` requires apps/web/ to contain an actual index.html.
 
   db:
     image: pgvector/pgvector:pg16
