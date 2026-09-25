@@ -76,12 +76,17 @@ def run_policy_agent(state: dict) -> dict:
             if "purchase date" in claim.text.lower():
                 purchase_date_str = claim.text.split(":")[-1].strip()
 
-    if purchase_date_str and decision.return_window_days:
+    if purchase_date_str:
         try:
             purchase_date = datetime.strptime(purchase_date_str.split()[0], "%Y-%m-%d")
             days_since = (datetime.utcnow() - purchase_date).days
-            decision.is_return_valid = days_since <= decision.return_window_days
-            # Warranty is typically longer than return window
+
+            if decision.return_window_days:
+                decision.is_return_valid = days_since <= decision.return_window_days
+
+            # Warranty is typically longer than return window, and is decided independently:
+            # a policy can state a warranty period without stating a return window, in which
+            # case gating this on return_window_days would leave the warranty undecided.
             if decision.warranty_period:
                 warranty_days = parse_days(decision.warranty_period)
                 if warranty_days is not None:
@@ -110,6 +115,26 @@ def run_policy_agent(state: dict) -> dict:
             Claim(
                 claim_id="policy_warranty_period",
                 text=f"Warranty period: {decision.warranty_period}",
+                claim_type=ClaimType.POLICY_RULE,
+                confidence=decision.confidence,
+            )
+        )
+    # The verdict is carried in the claim_id so downstream agents read a field rather than
+    # re-parsing prose. Absent entirely when the dates did not allow a decision, which lets
+    # action_agent tell "expired" apart from "could not determine".
+    if decision.is_warranty_valid is not None:
+        claims.append(
+            Claim(
+                claim_id=(
+                    "policy_warranty_valid"
+                    if decision.is_warranty_valid
+                    else "policy_warranty_expired"
+                ),
+                text=(
+                    "Warranty coverage is still valid"
+                    if decision.is_warranty_valid
+                    else "Warranty coverage has expired"
+                ),
                 claim_type=ClaimType.POLICY_RULE,
                 confidence=decision.confidence,
             )

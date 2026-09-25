@@ -39,12 +39,13 @@ def decide(monkeypatch):
 
     monkeypatch.setattr(pa, "PolicyDecision", SpyDecision)
 
-    def _run(days_ago: int, warranty_text: str):
+    def _run(days_ago: int, warranty_text: str, include_return_window: bool = True):
         purchase_date = (datetime.utcnow() - timedelta(days=days_ago)).strftime("%Y-%m-%d")
+        return_policy = "Return Policy: 30 days from delivery. " if include_return_window else ""
         chunk = EvidenceChunk(
             chunk_id="c1",
             source_id="s1",
-            text=f"Return Policy: 30 days from delivery. {warranty_text}",
+            text=f"{return_policy}{warranty_text}",
             metadata={"doc_type": "warranty"},
         )
         claim = Claim(
@@ -87,3 +88,20 @@ class TestWarrantyValidity:
         decision = decide(100, "Warranty: see enclosed documentation")
         assert decision.warranty_period is None
         assert decision.is_warranty_valid is None
+
+    def test_warranty_is_decided_without_a_return_window(self, decide):
+        """A policy stating a warranty period but no return window must still yield a verdict.
+
+        This is the shape of the sample data: the warranty card gives a period, and no
+        "return within N days" sentence appears anywhere. Gating the warranty on
+        return_window_days left it permanently undecided.
+        """
+        decision = decide(10, "Warranty: 30 days limited warranty", include_return_window=False)
+        assert decision.return_window_days is None
+        assert decision.warranty_period is not None
+        assert decision.is_warranty_valid is True
+
+    def test_expired_warranty_without_a_return_window(self, decide):
+        decision = decide(100, "Warranty: 30 days limited warranty", include_return_window=False)
+        assert decision.return_window_days is None
+        assert decision.is_warranty_valid is False

@@ -22,10 +22,15 @@ def run_action_agent(state: dict) -> dict:
     pending_actions: list[PendingAction] = []
 
     if "warranty" in intent or "return" in intent:
-        # Generate warranty/return recommendation
-        has_warranty = any(
-            "warranty" in c.text.lower() and "year" in c.text.lower() for c in verified
-        )
+        # Generate warranty/return recommendation. A warranty the policy agent has already
+        # ruled expired is not worth drafting a claim for. Fall back to the old text heuristic
+        # only when no verdict exists — no purchase date, or no stated warranty period.
+        verdict = _warranty_verdict(verified)
+        if verdict is None:
+            verdict = any(
+                "warranty" in c.text.lower() and "year" in c.text.lower() for c in verified
+            )
+        has_warranty = verdict
         has_return = any("return" in c.text.lower() for c in verified)
 
         if has_warranty:
@@ -158,9 +163,27 @@ def run_action_agent(state: dict) -> dict:
     }
 
 
+def _warranty_verdict(verified: list[Claim]) -> bool | None:
+    """The policy agent's warranty verdict, or None when it could not decide."""
+    claim_ids = {claim.claim_id for claim in verified}
+    if "policy_warranty_expired" in claim_ids:
+        return False
+    if "policy_warranty_valid" in claim_ids:
+        return True
+    return None
+
+
 def _build_summary(intent: str, verified: list[Claim]) -> str:
     if "warranty" in intent or "return" in intent:
-        if any("warranty" in c.text.lower() and "year" in c.text.lower() for c in verified):
+        verdict = _warranty_verdict(verified)
+        if verdict is False:
+            return (
+                "Warranty coverage has expired for this purchase, so a warranty claim is "
+                "unlikely to succeed. Check the return window and any extended coverage."
+            )
+        if verdict is True or any(
+            "warranty" in c.text.lower() and "year" in c.text.lower() for c in verified
+        ):
             return (
                 "Your product appears to be within the warranty period. "
                 "You can file a warranty claim. Return window may have expired."
