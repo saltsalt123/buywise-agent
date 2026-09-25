@@ -18,7 +18,7 @@ from ingestion.parsers.html_parser import parse_html
 def _chunks_for(html: str, tmp_path: Path) -> list[str]:
     path = tmp_path / "policy.html"
     path.write_text(html)
-    _, chunks = parse_html(str(path))
+    _, chunks, _ = parse_html(str(path))
     return [chunk.text for chunk in chunks]
 
 
@@ -66,18 +66,18 @@ class TestRealSampleFile:
     SAMPLE = Path("sample_data/laptop_return_case/return_policy.html")
 
     def test_no_label_only_chunks(self):
-        _, chunks = parse_html(str(self.SAMPLE))
+        _, chunks, _ = parse_html(str(self.SAMPLE))
         texts = [chunk.text for chunk in chunks]
         assert not [text for text in texts if text.endswith(":")], texts
 
     def test_each_rule_is_one_whole_chunk(self):
-        _, chunks = parse_html(str(self.SAMPLE))
+        _, chunks, _ = parse_html(str(self.SAMPLE))
         texts = [chunk.text for chunk in chunks]
         assert "Return Window: 14 days from delivery for laptops and electronics" in texts
         assert "Restocking Fee: 15% restocking fee for opened laptops" in texts
 
     def test_return_window_is_parseable_from_the_html_alone(self):
         """The receipt states it too, but the policy page must stand on its own."""
-        _, chunks = parse_html(str(self.SAMPLE))
+        _, chunks, _ = parse_html(str(self.SAMPLE))
         joined = " ".join(chunk.text.lower() for chunk in chunks)
         assert "return window: 14 days" in joined

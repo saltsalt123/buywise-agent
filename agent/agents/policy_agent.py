@@ -7,14 +7,15 @@ import re
 from datetime import datetime
 
 from agent.state import AgentMessage, Claim, ClaimType, EvidenceChunk, PolicyDecision
+from ingestion.labels import get_label, merge_labels
 
 
 def parse_days(text: str) -> int | None:
     """Extract a number of days from policy text."""
     patterns = [
-        r"(\d+)\s*(?:day|days)",
-        r"(\d+)\s*(?:year|years)",
-        r"(\d+)\s*(?:month|months)",
+        r"(\d+)\s*[- ]?\s*(?:days|day)",
+        r"(\d+)\s*[- ]?\s*(?:years|year)",
+        r"(\d+)\s*[- ]?\s*(?:months|month)",
     ]
     for pat in patterns:
         m = re.search(pat, text, re.IGNORECASE)
@@ -43,20 +44,35 @@ def run_policy_agent(state: dict) -> dict:
 
     all_text = " ".join(c.text for c in policy_chunks).lower()
 
+    # Labels first. These were captured while the document's own structure was available (an
+    # HTML block, a text line), so the label/value pairing is exact rather than reconstructed
+    # from flattened prose. The text patterns below stay as a fallback for anything unlabelled.
+    labels = merge_labels(policy_chunks)
+
     decision = PolicyDecision()
 
     # Extract return window
-    # Accepts both "30 days" and "30-day", since warranty cards commonly hyphenate it.
-    return_match = re.search(
-        r"return\s*(?:within|policy|window|period)[:\s]*(\d+)\s*[- ]?\s*(?:day|days)",
-        all_text,
+    labelled_window = get_label(
+        labels, "return window", "return policy", "return period", "returns"
     )
-    if return_match:
-        decision.return_window_days = int(return_match.group(1))
-        # A parsed return window is evidence of a real policy read; without this the decision
-        # kept the default 0.0 when no warranty period was present, publishing claims at
-        # confidence 0.0.
-        decision.confidence = max(decision.confidence, 0.85)
+    if labelled_window is not None:
+        labelled_days = parse_days(labelled_window)
+        if labelled_days is not None:
+            decision.return_window_days = labelled_days
+            decision.confidence = max(decision.confidence, 0.9)
+
+    if decision.return_window_days is None:
+        # Fallback: accepts both "30 days" and "30-day", since warranty cards hyphenate it.
+        return_match = re.search(
+            r"return\s*(?:within|policy|window|period)[:\s]*(\d+)\s*[- ]?\s*(?:day|days)",
+            all_text,
+        )
+        if return_match:
+            decision.return_window_days = int(return_match.group(1))
+            # A parsed return window is evidence of a real policy read; without this the
+            # decision kept the default 0.0 when no warranty period was present, publishing
+            # claims at confidence 0.0.
+            decision.confidence = max(decision.confidence, 0.85)
 
     # Extract warranty period
     warranty_match = re.search(
@@ -70,6 +86,23 @@ def run_policy_agent(state: dict) -> dict:
         if "1 year" in all_text or "one year" in all_text or "12 month" in all_text:
             decision.warranty_period = "1 year"
             decision.confidence = max(decision.confidence, 0.7)
+        else:
+            # Fallback to the labelled value. The period phrase itself is kept ("2 years",
+            # not "730 days") so the claim reads the way the document states it.
+            labelled_warranty = get_label(
+                labels, "warranty period", "warranty", "manufacturer warranty"
+            )
+            if labelled_warranty is not None:
+                # Longest alternatives first: with (?:year|years) the pattern matches
+                # "2 year" and drops the trailing "s".
+                period = re.search(
+                    r"(\d+)\s*[- ]?\s*(?:years|year|months|month|days|day)",
+                    labelled_warranty,
+                    re.IGNORECASE,
+                )
+                if period:
+                    decision.warranty_period = period.group(0).lower()
+                    decision.confidence = max(decision.confidence, 0.85)
 
     # Extract exceptions
     exception_keywords = [

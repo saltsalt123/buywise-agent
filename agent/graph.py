@@ -87,12 +87,13 @@ def _parse_one_file(path: str, seen: set[str]) -> list[EvidenceChunk]:
         elif ext == ".eml":
             src, chunks = parse_eml(path)
         elif ext in (".html", ".htm"):
-            src, chunks = parse_html(path)
+            src, chunks, _ = parse_html(path)
         elif ext == ".txt":
             # Treat .txt as a simple text source
             from datetime import datetime
 
             from agent.state import DocType, SourceDocument, make_chunk_id
+            from ingestion.labels import extract_labels
 
             name = p.stem.lower()
             doc_type = (
@@ -116,7 +117,12 @@ def _parse_one_file(path: str, seen: set[str]) -> list[EvidenceChunk]:
                     chunk_id=make_chunk_id(src.source_id, None, None, i),
                     source_id=src.source_id,
                     text=para[:2000],
-                    metadata={"doc_type": doc_type.value},
+                    # Same contract as the HTML parser: capture the label/value pairing while
+                    # the document's own line structure is still available.
+                    metadata={
+                        "doc_type": doc_type.value,
+                        "labels": extract_labels(para),
+                    },
                 )
                 for i, para in enumerate(paras)
             ]

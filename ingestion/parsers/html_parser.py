@@ -8,7 +8,16 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup, Comment
 
-from agent.state import DocType, EvidenceChunk, SourceDocument, hash_content, make_chunk_id
+from agent.state import (
+    DocType,
+    EvidenceChunk,
+    ParsedObject,
+    ParsedObjectType,
+    SourceDocument,
+    hash_content,
+    make_chunk_id,
+)
+from ingestion.labels import extract_labels
 
 # Tags to remove as boilerplate
 BOILERPLATE_TAGS = [
@@ -72,7 +81,7 @@ def clean_html(html: str) -> str:
 
 def parse_html(
     file_path: str, user_id: str = "default"
-) -> tuple[SourceDocument, list[EvidenceChunk]]:
+) -> tuple[SourceDocument, list[EvidenceChunk], list[ParsedObject]]:
     path = Path(file_path)
     raw_bytes = path.read_bytes()
     file_hash = hash_content(raw_bytes)
@@ -101,16 +110,32 @@ def parse_html(
     clean_text = clean_html(raw_html)
 
     chunks: list[EvidenceChunk] = []
+    parsed_objects: list[ParsedObject] = []
     paragraphs = [p.strip() for p in clean_text.split("\n") if p.strip()]
 
     for i, para in enumerate(paragraphs):
+        # Capture the label/value pairing while the block structure is still known. Downstream
+        # agents otherwise have to re-guess it from flattened prose, which is how a label once
+        # came to be read without the value beside it.
+        labels = extract_labels(para)
         chunk = EvidenceChunk(
             chunk_id=make_chunk_id(source.source_id, None, None, i),
             source_id=source.source_id,
             text=para[:2000],
-            metadata={"doc_type": doc_type.value},
+            metadata={"doc_type": doc_type.value, "labels": labels},
         )
         chunks.append(chunk)
 
+        if labels:
+            parsed_objects.append(
+                ParsedObject(
+                    object_id=f"obj_{file_hash[:12]}_c{i}",
+                    source_id=source.source_id,
+                    object_type=ParsedObjectType.POLICY_RULE,
+                    fields=labels,
+                    evidence_chunk_ids=[chunk.chunk_id],
+                )
+            )
+
     source.metadata["chunk_count"] = len(chunks)
-    return source, chunks
+    return source, chunks, parsed_objects

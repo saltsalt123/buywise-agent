@@ -60,8 +60,7 @@ def parse_file(file_path: str, user_id: str = "default") -> dict:
         source, chunks = parse_eml(file_path, user_id)
         parsed_objects = []
     elif parser_type == "html":
-        source, chunks = parse_html(file_path, user_id)
-        parsed_objects = []
+        source, chunks, parsed_objects = parse_html(file_path, user_id)
     else:
         raise ValueError(f"Unknown parser type: {parser_type}")
 
