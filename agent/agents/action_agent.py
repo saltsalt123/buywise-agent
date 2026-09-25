@@ -25,13 +25,22 @@ def run_action_agent(state: dict) -> dict:
         # Generate warranty/return recommendation. A warranty the policy agent has already
         # ruled expired is not worth drafting a claim for. Fall back to the old text heuristic
         # only when no verdict exists — no purchase date, or no stated warranty period.
-        verdict = _warranty_verdict(verified)
-        if verdict is None:
-            verdict = any(
+        warranty_verdict = _warranty_verdict(verified)
+        if warranty_verdict is None:
+            warranty_verdict = any(
                 "warranty" in c.text.lower() and "year" in c.text.lower() for c in verified
             )
-        has_warranty = verdict
-        has_return = any("return" in c.text.lower() for c in verified)
+        has_warranty = warranty_verdict
+
+        # Same treatment for returns, but a closed window still leaves the user something to
+        # do: ask for an exception. Keeping the raw verdict lets the branch below tell
+        # "closed" apart from "unknown".
+        return_verdict = _return_verdict(verified)
+        has_return = (
+            return_verdict
+            if return_verdict is not None
+            else any("return" in c.text.lower() for c in verified)
+        )
 
         if has_warranty:
             pending_actions.append(
@@ -55,7 +64,34 @@ def run_action_agent(state: dict) -> dict:
                     requires_approval=False,
                 )
             )
-        if has_return:
+        if return_verdict is False:
+            # A plain return request would misrepresent the situation, but merchants do grant
+            # exceptions, so offer that rather than dropping the action entirely.
+            pending_actions.append(
+                PendingAction(
+                    action_id="act_return_exception_request",
+                    action_type="draft_email",
+                    description=(
+                        "Draft an exception request — the return window has closed, so ask "
+                        "whether an exception is possible"
+                    ),
+                    payload={
+                        "subject": "Return Exception Request",
+                        "body": (
+                            "To Whom It May Concern,\n\n"
+                            "I would like to ask whether an exception can be made for a return. "
+                            "I understand the standard return window has closed, and I would "
+                            "appreciate it if you could consider my situation.\n\n"
+                            "[Order details]\n\n"
+                            "Thank you,\n"
+                            "[Your Name]"
+                        ),
+                        "include_order_number": True,
+                    },
+                    requires_approval=False,
+                )
+            )
+        elif has_return:
             pending_actions.append(
                 PendingAction(
                     action_id="act_return_request",
@@ -163,6 +199,16 @@ def run_action_agent(state: dict) -> dict:
     }
 
 
+def _return_verdict(verified: list[Claim]) -> bool | None:
+    """The policy agent's return-window verdict, or None when it could not decide."""
+    claim_ids = {claim.claim_id for claim in verified}
+    if "policy_return_expired" in claim_ids:
+        return False
+    if "policy_return_valid" in claim_ids:
+        return True
+    return None
+
+
 def _warranty_verdict(verified: list[Claim]) -> bool | None:
     """The policy agent's warranty verdict, or None when it could not decide."""
     claim_ids = {claim.claim_id for claim in verified}
@@ -175,18 +221,39 @@ def _warranty_verdict(verified: list[Claim]) -> bool | None:
 
 def _build_summary(intent: str, verified: list[Claim]) -> str:
     if "warranty" in intent or "return" in intent:
-        verdict = _warranty_verdict(verified)
-        if verdict is False:
+        warranty_verdict = _warranty_verdict(verified)
+        # A warranty being *mentioned* is not the same as it being *valid*: the text heuristic
+        # only says a period was written down somewhere, so it must not be read as "expired"
+        # when it comes back false.
+        warranty_mentioned = any(
+            "warranty" in c.text.lower() and "year" in c.text.lower() for c in verified
+        )
+        returns = _return_verdict(verified)
+
+        if warranty_verdict is False:
+            if returns is True:
+                return (
+                    "Warranty coverage has expired, but the return window is still open — "
+                    "request a return rather than a warranty claim."
+                )
             return (
                 "Warranty coverage has expired for this purchase, so a warranty claim is "
                 "unlikely to succeed. Check the return window and any extended coverage."
             )
-        if verdict is True or any(
-            "warranty" in c.text.lower() and "year" in c.text.lower() for c in verified
-        ):
+        if warranty_verdict is True or warranty_mentioned:
+            if returns is False:
+                return (
+                    "Your product is still within its warranty period, but the return window "
+                    "has closed. A warranty claim is the remaining option."
+                )
             return (
                 "Your product appears to be within the warranty period. "
                 "You can file a warranty claim. Return window may have expired."
+            )
+        if returns is False:
+            return (
+                "The return window has closed and no warranty period was found in the "
+                "documents. Check for extended coverage or contact support."
             )
         return "Analysis complete. Check the key facts below for warranty/return status."
     elif "purchase" in intent:

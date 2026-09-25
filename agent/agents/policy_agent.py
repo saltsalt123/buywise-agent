@@ -32,18 +32,31 @@ def parse_days(text: str) -> int | None:
 def run_policy_agent(state: dict) -> dict:
     """Analyze return and warranty policies from evidence chunks."""
     chunks: list[EvidenceChunk] = state.get("retrieved_evidence", [])
-    policy_chunks = [c for c in chunks if c.metadata.get("doc_type") in ("warranty", "policy")]
+    # Receipts state policy lines too ("Return Policy: 30 days from purchase date"), and in the
+    # sample cases the return window lives there while the warranty card phrases it in a form
+    # the pattern below does not match.
+    policy_chunks = [
+        c
+        for c in chunks
+        if c.metadata.get("doc_type") in ("warranty", "policy", "receipt")
+    ]
 
     all_text = " ".join(c.text for c in policy_chunks).lower()
 
     decision = PolicyDecision()
 
     # Extract return window
+    # Accepts both "30 days" and "30-day", since warranty cards commonly hyphenate it.
     return_match = re.search(
-        r"return\s*(?:within|policy|window|period)[:\s]*(\d+)\s*(?:day|days)", all_text
+        r"return\s*(?:within|policy|window|period)[:\s]*(\d+)\s*[- ]?\s*(?:day|days)",
+        all_text,
     )
     if return_match:
         decision.return_window_days = int(return_match.group(1))
+        # A parsed return window is evidence of a real policy read; without this the decision
+        # kept the default 0.0 when no warranty period was present, publishing claims at
+        # confidence 0.0.
+        decision.confidence = max(decision.confidence, 0.85)
 
     # Extract warranty period
     warranty_match = re.search(
@@ -51,12 +64,12 @@ def run_policy_agent(state: dict) -> dict:
     )
     if warranty_match:
         decision.warranty_period = warranty_match.group(0)
-        decision.confidence = 0.85
+        decision.confidence = max(decision.confidence, 0.85)
     else:
         # Look for 1-year as default in many consumer policies
         if "1 year" in all_text or "one year" in all_text or "12 month" in all_text:
             decision.warranty_period = "1 year"
-            decision.confidence = 0.7
+            decision.confidence = max(decision.confidence, 0.7)
 
     # Extract exceptions
     exception_keywords = [
@@ -96,7 +109,12 @@ def run_policy_agent(state: dict) -> dict:
 
     claims = []
     if decision.return_window_days:
-        status = "within" if decision.is_return_valid else "past"
+        if decision.is_return_valid is None:
+            status = "undetermined"  # a missing purchase date is not the same as "past"
+        elif decision.is_return_valid:
+            status = "within"
+        else:
+            status = "past"
         claims.append(
             Claim(
                 claim_id="policy_return_window",
@@ -108,6 +126,25 @@ def run_policy_agent(state: dict) -> dict:
                     if decision.is_return_valid is not None
                     else "Cannot determine purchase date"
                 ),
+            )
+        )
+    # Same contract as the warranty verdict below: the id carries the answer, and the claim is
+    # absent when the dates did not allow one.
+    if decision.is_return_valid is not None:
+        claims.append(
+            Claim(
+                claim_id=(
+                    "policy_return_valid"
+                    if decision.is_return_valid
+                    else "policy_return_expired"
+                ),
+                text=(
+                    "The return window is still open"
+                    if decision.is_return_valid
+                    else "The return window has closed"
+                ),
+                claim_type=ClaimType.POLICY_RULE,
+                confidence=decision.confidence,
             )
         )
     if decision.warranty_period:
