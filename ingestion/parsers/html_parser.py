@@ -16,6 +16,15 @@ BOILERPLATE_TAGS = [
     "aside", "noscript", "iframe", "form", "button",
 ]
 
+# Inline markup carries no line-break semantics, but `get_text(separator="\n")` inserts a
+# separator between *every* element. So "<p><strong>Return Window:</strong> 14 days from
+# delivery</p>" came out as two lines, and since this parser chunks one line per chunk, the
+# label ended up in a chunk without its value. Unwrapping these first keeps a paragraph whole.
+INLINE_TAGS = [
+    "strong", "b", "em", "i", "u", "span", "a", "small", "code",
+    "abbr", "cite", "mark", "sub", "sup", "label", "time",
+]
+
 
 def clean_html(html: str) -> str:
     """Strip boilerplate HTML elements and return clean text."""
@@ -35,6 +44,14 @@ def clean_html(html: str) -> str:
         style = el.get("style", "")
         if "display:none" in style or "visibility:hidden" in style:
             el.decompose()
+
+    # Flatten inline markup before text extraction; see INLINE_TAGS. Unwrapping alone is not
+    # enough: it turns the tag into text but leaves that text as its own node, and get_text
+    # still separates adjacent nodes. smooth() merges them so a paragraph reads as one line.
+    for tag in INLINE_TAGS:
+        for el in soup.find_all(tag):
+            el.unwrap()
+    soup.smooth()
 
     # Keep only main/product/review/policy areas if they exist
     main = soup.find("main") or soup.find(
