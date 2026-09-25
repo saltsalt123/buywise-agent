@@ -83,9 +83,9 @@ def run_policy_agent(state: dict) -> dict:
             decision.is_return_valid = days_since <= decision.return_window_days
             # Warranty is typically longer than return window
             if decision.warranty_period:
-                decision.is_warranty_valid = (
-                    days_since <= parse_days(decision.warranty_period) or True
-                )
+                warranty_days = parse_days(decision.warranty_period)
+                if warranty_days is not None:
+                    decision.is_warranty_valid = days_since <= warranty_days
         except (ValueError, IndexError):
             pass
 
