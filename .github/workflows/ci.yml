@@ -54,3 +54,40 @@ jobs:
 
       - name: Eval
         run: make eval
+
+  smoke:
+    # Not part of the matrix: the demos exercise one interpreter's worth of end-to-end
+    # behaviour, and repeating them on 3.10/3.12 buys nothing the suite does not already
+    # cover version-by-version.
+    name: demo smoke tests (Python 3.11)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      # `make demo` exits 0 even if the workflow produced an empty answer, so the markers the
+      # demo itself prints are asserted as well. A smoke test whose only assertion is "the
+      # process exited" would pass on a demo that silently stopped working.
+      - name: Warranty demo
+        run: |
+          set -o pipefail
+          make demo | tee /tmp/demo-warranty.log
+          grep -qF "ANALYSIS RESULT" /tmp/demo-warranty.log
+          grep -qF "Demo complete" /tmp/demo-warranty.log
+
+      - name: Laptop return demo
+        run: |
+          set -o pipefail
+          make demo-laptop | tee /tmp/demo-laptop.log
+          grep -qF "LAPTOP RETURN DEMO" /tmp/demo-laptop.log
+          grep -qF "Intent:" /tmp/demo-laptop.log
