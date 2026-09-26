@@ -1,9 +1,9 @@
-.PHONY: setup install up down dev lint test demo demo-laptop eval clean
+.PHONY: setup install up down dev lint test test-ci demo demo-laptop eval clean
 
-# Interpreter used by the Python targets. The project is developed and tested on
-# Python 3.10; other 3.10+ versions are allowed by pyproject but are not covered
-# by CI. Defaults to `python3` so that an activated virtualenv wins — override
-# explicitly for a pinned interpreter:  make demo PYTHON=python3.10
+# Interpreter used by the Python targets. Defaults to `python3` so that an activated
+# virtualenv wins — override explicitly for a pinned interpreter:
+#   make demo PYTHON=python3.10
+# CI runs the suite on 3.10, 3.11 and 3.12 (see .github/workflows/ci.yml).
 PYTHON ?= python3
 
 # ── Setup ────────────────────────────────
@@ -33,6 +33,12 @@ lint:
 
 test:
 	$(PYTHON) -m pytest -q --tb=short
+
+# Strict variant for CI: same suite, but a skip or a shrunken count is a failure.
+# `make test` cannot see either — a module-level importorskip once hid 14 tests behind
+# "1 skipped" with exit code 0.
+test-ci:
+	$(PYTHON) scripts/check_no_pytest_skips.py
 
 # ── Demo ─────────────────────────────────
 

@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A superseded run on the same ref is noise: a quick second commit should not leave two
+# matrices competing for the same runner minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: lint + tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      # One version failing must not cancel the others — the version that broke is the
+      # interesting part of the result.
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      # The install is asserted, not assumed: a dependency missing from the `dev` extra
+      # would otherwise only show up as a smaller test suite. This fails at the first step
+      # with a clear message instead. `make test-ci` then fails on any skip and on a count
+      # below the expected total, so "353 passed, 1 skipped" cannot pass as green.
+      - name: Assert the test dependencies are installed
+        run: python -c "import fastapi, pdfplumber, pytest, reportlab, ruff"
+
+      - name: Lint
+        run: make lint
+
+      - name: Tests (a skip or a shrunken suite fails the build)
+        run: make test-ci
+
+      - name: Eval
+        run: make eval

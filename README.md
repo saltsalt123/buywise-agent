@@ -1,6 +1,7 @@
 # BuyWise Agent MVP 🤖🛒
 
 <p align="center">
+  <a href="https://github.com/saltsalt123/buywise-agent/actions/workflows/ci.yml"><img src="https://github.com/saltsalt123/buywise-agent/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License">
   <img src="https://img.shields.io/badge/framework-LangGraph-6C5CE7" alt="LangGraph">
@@ -37,11 +38,16 @@ Upload a receipt + warranty card + policy → ask "can I still return/warranty t
 # 1. Install (MVP core deps only). The Makefile uses $(PYTHON), which defaults to
 #    `python3` — activate the venv so it resolves to the project interpreter, or
 #    override per run: make demo PYTHON=python3.10
+#    If `python3 -m venv` has no ensurepip (Debian/Ubuntu need python3-venv), the venv
+#    comes out without pip and `source` fails — leaving pip to install globally. Use
+#    `virtualenv .venv` instead, and check `which python3` points inside .venv.
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
 # 2. Run the test suite
 make test
+# The strict gate CI uses: fails on any skip or a shrunken suite
+make test-ci
 
 # 3. Run the warranty demo
 make demo
@@ -49,7 +55,7 @@ make demo
 # 4. Try the laptop return case
 make demo-laptop
 
-# 5. Run eval (2 positive cases x 4 metrics + 4 negative cases)
+# 5. Run eval (2 positive cases x 4 metrics + 5 negative cases)
 make eval
 
 # 6. Start FastAPI server
@@ -181,6 +187,28 @@ to stop, so these are reported explicitly:
 | `case_contradictory_policy` | receipt grants a 30-day window while the merchant's policy is final sale → `status=needs_human_review`, **no** `act_return_request`, conflict recorded, `confidence<=0.5`, summary explains the disagreement |
 
 Results are written to `eval/reports/latest.md`.
+
+## ✅ CI & Development checks
+
+Every push to `main` and every pull request runs
+[CI](https://github.com/saltsalt123/buywise-agent/actions/workflows/ci.yml) on **Python 3.10,
+3.11 and 3.12**: lint, the strict test check, and the eval suite.
+
+Recommended locally before pushing:
+
+```bash
+make lint       # ruff
+make test-ci    # pytest, but a skip or a shrunken suite fails the run
+make eval       # 2 positive cases x 4 metrics + 5 negative cases
+```
+
+`make test` is the everyday run — it reports skips and keeps going. `make test-ci` is the
+gate: it fails if **any** test is skipped, and if the passing count falls below the expected
+total (368). That strictness is not pedantry. A test-only dependency (`reportlab`) was
+missing from the `dev` extra, its module-level `pytest.importorskip` turned fourteen
+parser-robustness tests into one module skip, and the run reported
+`353 passed, 1 skipped` with exit code 0 — a smaller suite wearing a green face. `make
+test-ci` exists so that cannot happen again, in CI or on a laptop.
 
 ## 📁 Structure
 
