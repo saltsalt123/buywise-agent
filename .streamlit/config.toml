@@ -1,0 +1,16 @@
+# Streamlit configuration for the BuyWise Agent UI.
+#
+# Committed so `make ui` works on a machine that has never run Streamlit. Without a usage
+# stats setting, Streamlit's first run asks for an email address on stdin before it will
+# serve anything; in a non-interactive shell that prompt hits EOF and the process exits 255,
+# which reads as "the UI is broken".
+#
+# `gatherUsageStats = false` both suppresses the prompt and stops Streamlit phoning home —
+# the UI is meant to be local-only, with no external calls.
+
+[browser]
+gatherUsageStats = false
+
+[server]
+# The app is local-only. Streamlit's default CORS/XSRF posture is kept as-is.
+headless = true

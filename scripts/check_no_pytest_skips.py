@@ -27,7 +27,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # The suite size. Raise this whenever tests are added; never lower it to make a run pass —
 # a drop means tests disappeared, which is the thing this script exists to catch.
-EXPECTED_MIN_TESTS = 368
+EXPECTED_MIN_TESTS = 417
 
 # Failures are reported with the skip reasons so the cause is on screen, not in a log file.
 MAX_SKIP_REASONS = 40

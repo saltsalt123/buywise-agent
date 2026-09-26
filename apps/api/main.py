@@ -12,18 +12,20 @@ entered so a rejected request costs no ingestion work and returns nothing.
 """
 from __future__ import annotations
 
-from pathlib import Path
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from agent.graph import run_workflow
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-
-# Directories the API is allowed to read documents from. Everything else is refused.
-SAFE_SOURCE_ROOTS: tuple[Path, ...] = (PROJECT_ROOT / "sample_data",)
+# The roots live in apps/safe_paths.py so the API and the Streamlit UI cannot drift apart:
+# a directory the UI writes but the API refuses would be a broken UI. Re-exported here
+# because this module is where callers and tests have always read SAFE_SOURCE_ROOTS from.
+from apps.safe_paths import (  # noqa: F401  (re-exported for callers and tests)
+    SAFE_SOURCE_ROOTS,
+    UnsafeUploadError,
+    resolve_within_safe_roots,
+)
 
 app = FastAPI(title="BuyWise Agent MVP", version="0.2.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -49,30 +51,15 @@ def resolve_source_dirs(source_dirs: list[str]) -> list[str]:
     """Resolve each requested path and refuse anything outside ``SAFE_SOURCE_ROOTS``.
 
     Relative paths are taken from the project root.  ``Path.resolve()`` follows symlinks and
-    collapses ``..`` before the comparison, so both escape routes are closed.
+    collapses ``..`` before the comparison, so both escape routes are closed.  The shared
+    helper does the work; this wrapper only translates the refusal into HTTP.
     """
-    roots = [root.resolve() for root in SAFE_SOURCE_ROOTS]
     resolved: list[str] = []
-
     for raw in source_dirs:
-        candidate = Path(raw)
-        if not candidate.is_absolute():
-            candidate = PROJECT_ROOT / candidate
-        resolved_path = candidate.resolve()
-
-        permitted = any(
-            resolved_path == root or resolved_path.is_relative_to(root) for root in roots
-        )
-        if not permitted:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"source_dirs entry {raw!r} is outside the allowed roots "
-                    f"({', '.join(str(r) for r in roots)})"
-                ),
-            )
-        resolved.append(str(resolved_path))
-
+        try:
+            resolved.append(str(resolve_within_safe_roots(raw)))
+        except UnsafeUploadError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from None
     return resolved
 
 

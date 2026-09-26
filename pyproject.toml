@@ -60,6 +60,11 @@ dev = [
     # so a fresh `pip install -e ".[dev]"` can run that suite; without it the module's
     # top-level importorskip turns the whole file into one silent skip.
     "reportlab>=4.0.0",
+    # The Streamlit UI (`make ui`). It lives in dev rather than a separate extra so the one
+    # install command the README documents is enough to run everything. The UI tests do not
+    # import it — they exercise apps/ui/uploads.py, which is plain functions — so a
+    # streamlit problem can never turn them into a silent skip.
+    "streamlit>=1.30.0",
 ]
 
 [tool.setuptools.packages.find]
