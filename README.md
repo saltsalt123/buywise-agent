@@ -61,10 +61,38 @@ make eval
 # 6. Start FastAPI server
 make dev
 
-# 7. (optional) Full stack: API + PostgreSQL + Redis via Docker
+# 7. Minimal Streamlit UI (browser, local only)
+make ui                # http://localhost:8501
+
+# 8. (optional) Full stack: API + PostgreSQL + Redis via Docker
 cp .env.example .env   # docker compose requires this file to exist
-make up                # web UI (3000) is NOT included — see Roadmap Phase 7
+make up                # the Streamlit UI is separate — run `make ui` for that
 ```
+
+## 🖥️ Streamlit UI
+
+```bash
+pip install -e ".[dev]"
+make ui                # http://localhost:8501
+```
+
+Drop in a receipt / warranty card / return policy / support email (`.txt`, `.pdf`, `.csv`,
+`.eml`, `.html`), type a question, and press **Analyze** — or press **Load headphone sample**
+/ **Load laptop sample** to run a bundled case in one click. The page shows the status, the
+confidence, the summary, key facts, verified and unsupported claims, drafted actions (with the
+draft email body), and every retrieved evidence chunk with its `source_id`, `doc_type` and
+`chunk_id`.
+
+Two things worth knowing:
+
+- Uploads land in `data/uploads/session_<id>/` (git-ignored). That directory is one of the
+  `SAFE_SOURCE_ROOTS` the HTTP API also enforces, so an uploaded file is readable by the
+  workflow and nothing outside those roots ever is. A file name arrives from a browser as
+  untrusted input: anything carrying a directory component, an absolute path or a disallowed
+  extension is refused rather than silently rewritten.
+- Everything runs in-process against the local workflow. No external APIs, no account, no
+  telemetry — `.streamlit/config.toml` turns usage reporting off so the first run does not
+  prompt for an email address.
 
 ## 📸 Demo Output
 
@@ -204,7 +232,7 @@ make eval       # 2 positive cases x 4 metrics + 5 negative cases
 
 `make test` is the everyday run — it reports skips and keeps going. `make test-ci` is the
 gate: it fails if **any** test is skipped, and if the passing count falls below the expected
-total (368). That strictness is not pedantry. A test-only dependency (`reportlab`) was
+total (417). That strictness is not pedantry. A test-only dependency (`reportlab`) was
 missing from the `dev` extra, its module-level `pytest.importorskip` turned fourteen
 parser-robustness tests into one module skip, and the run reported
 `353 passed, 1 skipped` with exit code 0 — a smaller suite wearing a green face. `make
@@ -225,9 +253,12 @@ buywise-agent/
 │   ├── parsers/        # File parsers (PDF, CSV, EML, HTML, TXT)
 │   └── labels.py       # Label/value extraction
 ├── retrieval/          # IDF-weighted keyword search + rerank + compress
-├── apps/api/           # FastAPI backend (2 endpoints, path whitelist on /api/chat)
+├── apps/
+│   ├── safe_paths.py   # The one place that decides which directories may be read
+│   ├── api/            # FastAPI backend (2 endpoints, path whitelist on /api/chat)
+│   └── ui/             # Streamlit UI (uploads.py holds the path rules, no streamlit import)
 ├── eval/               # Eval suite (2 positive cases x 4 metrics + 5 negative cases)
-├── tests/              # Pytest suite (368 tests)
+├── tests/              # Pytest suite (417 tests)
 ├── sample_data/        # 3 synthetic demo cases
 ├── scripts/demo.py     # CLI demo runner
 ├── docker-compose.yml  # API + PostgreSQL + Redis (no web UI / worker — see Roadmap)
@@ -284,7 +315,7 @@ each row is the regression guard.
 | 11 | **A zero-day return window vanished.** `if decision.return_window_days:` is falsy for `0`, so "Return Policy: 0 days" — final sale stated in numbers — produced no window claim and no verdict at all. | the guard is `is not None`; a 0-day window is recorded, judged not-valid, and published as `policy_return_unavailable`, which routes to an exception request | `test_zero_day_return_window.py` |
 | 12 | **Most refusal wordings were invisible.** Only 10 phrases were recognised, so "all sales are final", "not eligible for return", "clearance items cannot be returned", "exchange only" and "refunds are unavailable" read as a policy that says nothing about returns. | the refusal list covers plain, eligibility and exchange-only refusals; a refusal with a window is a conflict, a refusal alone is "returns unavailable" | `test_return_refusal_patterns.py` |
 
-Suite: **368 tests** (94 pre-existing, all still passing; the rest added over three rounds).
+Suite: **417 tests** (94 pre-existing, all still passing; the rest added over four rounds).
 
 Known limits, stated rather than hidden:
 

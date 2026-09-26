@@ -1,4 +1,4 @@
-.PHONY: setup install up down dev lint test test-ci demo demo-laptop eval clean
+.PHONY: setup install up down dev ui lint test test-ci demo demo-laptop eval clean
 
 # Interpreter used by the Python targets. Defaults to `python3` so that an activated
 # virtualenv wins — override explicitly for a pinned interpreter:
@@ -27,6 +27,11 @@ down:
 
 dev:
 	uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --reload
+
+# Minimal Streamlit UI (upload receipts/policies, or load a sample case).
+# Runs the workflow in-process — the API server does not need to be running.
+ui:
+	$(PYTHON) -m streamlit run apps/ui/streamlit_app.py
 
 lint:
 	$(PYTHON) -m ruff check agent/ ingestion/ retrieval/ apps/ eval/ scripts/ tests/
