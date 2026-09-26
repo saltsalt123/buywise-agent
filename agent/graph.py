@@ -15,11 +15,9 @@ from agent.agents.verifier_agent import run_verifier
 from agent.state import BuyWiseState, EvidenceChunk, IntentType
 from retrieval import HybridRetrievalPipeline, SimpleRetriever
 
-# ── Shared retriever (index once, search many) ────────────────────────────
+# ── Per-run retrieval index ──────────────────────────────────────────────
 
 logger = logging.getLogger(__name__)
-
-_RETRIEVER: SimpleRetriever | None = None
 
 # Retrieval budget. Measured against the sample corpus: evidence recall saturates at
 # top_k=20 / max_chunks=15 (case_001 1.00, case_002 0.80) — larger budgets gave no
@@ -28,13 +26,22 @@ _RETRIEVER: SimpleRetriever | None = None
 _TOP_K = 20
 _MAX_CHUNKS = 15
 
+# One extra retrieval pass is allowed when the verifier cannot support every claim.
+_MAX_RETRIEVAL_ATTEMPTS = 2
 
-def _get_retriever() -> SimpleRetriever:
-    """Singleton retriever – we load sample data once."""
-    global _RETRIEVER
-    if _RETRIEVER is None:
-        _RETRIEVER = SimpleRetriever()
-    return _RETRIEVER
+
+def _retriever_for(state: dict) -> SimpleRetriever:
+    """The retrieval index belonging to this run.
+
+    This used to be a module-level ``_RETRIEVER`` singleton, which meant two requests in
+    flight shared one corpus: the second ``index_chunks`` overwrote the first, and the
+    doc-type fallback below reads ``retriever._chunks``, so one user's receipts could be
+    retrieved into another user's answer. The index now travels with the state.
+    """
+    retriever = state.get("retriever")
+    if retriever is None:
+        retriever = SimpleRetriever()
+    return retriever
 
 
 def _load_sample_data(source_ids: list[str]) -> list[EvidenceChunk]:
@@ -147,26 +154,34 @@ def classify_intent_node(state: dict) -> dict:
 
 
 def ingest_and_index_node(state: dict) -> dict:
-    """Node 2 – parse sample files and index into retriever."""
+    """Node 2 – parse sample files and index into this run's retriever."""
     source_ids = state.get("uploaded_source_ids", [])
     if not source_ids:
-        return {**state, "retrieval_attempts": state.get("retrieval_attempts", 0) + 1}
+        return {**state, "retriever": _retriever_for(state), "_indexed_chunks": 0}
 
     chunks = _load_sample_data(source_ids)
-    retriever = _get_retriever()
+    retriever = SimpleRetriever()
     retriever.index_chunks(chunks)
 
     return {
         **state,
-        "retrieval_attempts": state.get("retrieval_attempts", 0) + 1,
+        "retriever": retriever,
         "_indexed_chunks": len(chunks),
     }
 
 
 def retrieve_evidence_node(state: dict) -> dict:
-    """Node 3 – retrieve evidence relevant to the user query."""
+    """Node 3 – retrieve evidence relevant to the user query.
+
+    Also the node that advances the retrieval counter.  `route_after_verify` uses that
+    counter to decide whether another pass is worth it, but only `ingest_and_index` used to
+    increment it — and ingest runs once.  On the second pass the counter was therefore
+    still 1, the branch was taken again, and the graph looped between retrieve and verify
+    without ever returning.  Advancing it here makes the guard reachable.
+    """
     query = state.get("user_query", "")
-    retriever = _get_retriever()
+    retriever = _retriever_for(state)
+    attempts = state.get("retrieval_attempts", 0) + 1
 
     pipeline = HybridRetrievalPipeline(retriever)
 
@@ -184,7 +199,11 @@ def retrieve_evidence_node(state: dict) -> dict:
             result["chunks"].append(c)
             seen_types.add(dt)
 
-    return {**state, "retrieved_evidence": result["chunks"]}
+    return {
+        **state,
+        "retrieved_evidence": result["chunks"],
+        "retrieval_attempts": attempts,
+    }
 
 
 def run_specialist_agents_node(state: dict) -> dict:
@@ -230,14 +249,15 @@ def final_response_node(state: dict) -> dict:
             },
         }
 
-    return {
-        **state,
-        "final_answer": {
-            **answer,
-            "status": "complete",
-            "message": "BuyWise Agent analysis complete.",
-        },
-    }
+    # The action agent already decided the status: "complete" when claims were verified,
+    # and "no_evidence"/"insufficient_evidence" when they were not. Stamping "complete"
+    # here unconditionally made an evidence-free run indistinguishable from a real
+    # analysis, which is the opposite of what the status field is for.
+    final = {**answer}
+    final.setdefault("status", "complete")
+    final["message"] = "BuyWise Agent analysis complete."
+
+    return {**state, "final_answer": final}
 
 
 # ── Conditional routing (all loop-guarded) ────────────────────────────────
@@ -263,9 +283,13 @@ def route_after_ingest(
 def route_after_verify(
     state: dict,
 ) -> Literal["decide_action", "retrieve_evidence"]:
-    """If unsupported claims exist, do one re-retrieval attempt."""
+    """If unsupported claims exist, do one re-retrieval attempt.
+
+    Bounded by `_MAX_RETRIEVAL_ATTEMPTS`, and `retrieve_evidence_node` is what advances the
+    counter — without that this branch could be taken forever.
+    """
     attempts = state.get("retrieval_attempts", 0)
-    if len(state.get("unsupported_claims", [])) > 0 and attempts < 2:
+    if len(state.get("unsupported_claims", [])) > 0 and attempts < _MAX_RETRIEVAL_ATTEMPTS:
         return "retrieve_evidence"
     return "decide_action"
 
@@ -320,10 +344,11 @@ def run_workflow(
     uploaded_source_ids: list[str] | None = None,
     user_id: str = "default",
 ) -> dict[str, Any]:
-    """Run the MVP warranty/return workflow."""
-    global _RETRIEVER
-    _RETRIEVER = None  # Reset so sample data is reloaded
+    """Run the MVP warranty/return workflow.
 
+    No process-wide state: the retrieval index is created inside the run and carried on the
+    state, so concurrent requests cannot read each other's corpus.
+    """
     graph = build_graph()
 
     initial_state = {
@@ -344,6 +369,7 @@ def run_workflow(
         "errors": [],
         "cache_keys": {},
         "product_facts": None,
+        "retriever": None,
     }
 
     config = {"configurable": {"thread_id": initial_state["conversation_id"]}}

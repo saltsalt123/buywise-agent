@@ -12,14 +12,64 @@ from agent.state import (
     PendingAction,
 )
 
+# The supervisor's own output.  Its text is literally "Intent classified as: warranty_or_return",
+# which contains the word "return" — and that was being read as evidence that a return is
+# available, so the user's own question became the justification for the drafted documents.
+# It describes how the request was routed, not what the documents say.
+INTENT_CLAIM_IDS = frozenset({"intent_classified"})
+
+NO_EVIDENCE_STATUS = "no_evidence"
+INSUFFICIENT_EVIDENCE_STATUS = "insufficient_evidence"
+CONFLICT_STATUS = "needs_human_review"
+
+# Claim ids that carry a decision rather than a document fact.
+RETURN_CONFLICT_CLAIM_ID = "policy_return_conflict"
+
+# Contradictory documents cannot support a confident answer, whatever the claim ratio says.
+_MAX_CONFLICT_CONFIDENCE = 0.5
+
+_NO_EVIDENCE_SUMMARY = (
+    "No receipt, return policy or warranty evidence was found in the documents provided, "
+    "so the return and warranty position could not be determined. Add the purchase receipt, "
+    "the merchant's return policy, or the warranty card and run the analysis again."
+)
+
+_UNVERIFIED_EVIDENCE_SUMMARY = (
+    "Documents were found, but none of them states a receipt date, return policy or "
+    "warranty period that could be verified, so the return and warranty position could not "
+    "be determined. Check that the receipt, return policy and warranty card are included."
+)
+
+_CONFLICT_SUMMARY = (
+    "Conflicting return terms: the receipt states a return window, while the merchant's "
+    "policy says this item is final sale and returns are not accepted. Both are recorded "
+    "below, but the documents disagree, so this needs a human decision before anything is "
+    "sent. Ask the merchant which term applies to this order, or request an exception in "
+    "writing."
+)
+
+
+def _evidence_claims(claims: list[Claim]) -> list[Claim]:
+    """Drop claims that describe routing rather than the documents."""
+    return [c for c in claims if c.claim_id not in INTENT_CLAIM_IDS]
+
+
+def _has_return_conflict(claims: list[Claim]) -> bool:
+    """True when the documents contradict each other about returns."""
+    return any(c.claim_id == RETURN_CONFLICT_CLAIM_ID for c in claims)
+
+
 
 def run_action_agent(state: dict) -> dict:
     """Generate action items based on verified claims."""
-    verified = state.get("verified_claims", [])
-    unsupported = state.get("unsupported_claims", [])
+    verified = _evidence_claims(state.get("verified_claims", []))
+    unsupported = _evidence_claims(state.get("unsupported_claims", []))
     intent = state.get("intent", "")
+    documents = state.get("retrieved_evidence") or []
 
     pending_actions: list[PendingAction] = []
+    # Only the warranty/return branch can detect a return conflict; other intents never do.
+    conflict = False
 
     if "warranty" in intent or "return" in intent:
         # Generate warranty/return recommendation. A warranty the policy agent has already
@@ -36,6 +86,7 @@ def run_action_agent(state: dict) -> dict:
         # do: ask for an exception. Keeping the raw verdict lets the branch below tell
         # "closed" apart from "unknown".
         return_verdict = _return_verdict(verified)
+        conflict = _has_return_conflict(verified)
         has_return = (
             return_verdict
             if return_verdict is not None
@@ -64,7 +115,38 @@ def run_action_agent(state: dict) -> dict:
                     requires_approval=False,
                 )
             )
-        if return_verdict is False:
+        if conflict:
+            # The documents disagree. Drafting a plain return request would assert one side
+            # of a disagreement the merchant has already refused in writing, so the only
+            # honest action is to ask which term governs.
+            pending_actions.append(
+                PendingAction(
+                    action_id="act_return_exception_request",
+                    action_type="draft_email",
+                    description=(
+                        "Draft a clarification request — the receipt and the merchant's policy "
+                        "state conflicting return terms, so ask which one applies"
+                    ),
+                    payload={
+                        "subject": "Conflicting return terms on order — please clarify",
+                        "body": (
+                            "To Whom It May Concern,\n\n"
+                            "I am writing about a return. My receipt states a return window, "
+                            "but your published policy states that this item is final sale and "
+                            "returns are not accepted. These two terms conflict.\n\n"
+                            "Could you confirm which term applies to my order, and whether an "
+                            "exception is possible?\n\n"
+                            "[Order details]\n\n"
+                            "Thank you,\n"
+                            "[Your Name]"
+                        ),
+                        "include_order_number": True,
+                        "reason": "conflicting_return_terms",
+                    },
+                    requires_approval=False,
+                )
+            )
+        elif return_verdict is False:
             # A plain return request would misrepresent the situation, but merchants do grant
             # exceptions, so offer that rather than dropping the action entirely.
             pending_actions.append(
@@ -167,9 +249,40 @@ def run_action_agent(state: dict) -> dict:
         next_actions=[],
     )
 
-    # Build final answer
+    # Build final answer.
+    #
+    # Status and confidence have to reflect how much was actually established. With no
+    # documents the only verified claim used to be the supervisor's own intent line, which
+    # made `_calc_confidence` report 1/1 = 1.0 — maximum confidence from zero evidence.
+    #
+    # An absent `retrieved_evidence` key is not the same as an empty one: the key is missing
+    # when a caller drives this agent directly to exercise the action logic, and claiming
+    # "no evidence" there would be wrong. Only an explicitly empty document set means none
+    # was found.
+    documents_supplied = "retrieved_evidence" in state
+    if documents_supplied and not documents:
+        status = NO_EVIDENCE_STATUS
+        summary = _NO_EVIDENCE_SUMMARY
+    elif documents_supplied and not verified:
+        status = INSUFFICIENT_EVIDENCE_STATUS
+        summary = _UNVERIFIED_EVIDENCE_SUMMARY
+    elif conflict:
+        # Documents that contradict each other cannot be reported as a finished analysis.
+        status = CONFLICT_STATUS
+        summary = _CONFLICT_SUMMARY
+    else:
+        status = "complete"
+        summary = _build_summary(intent, verified)
+
+    confidence = _calc_confidence(verified, unsupported)
+    if conflict:
+        # The claim ratio can read 1.0 here — every claim is individually well-supported —
+        # which is exactly the wrong message when the sources disagree with each other.
+        confidence = min(confidence, _MAX_CONFLICT_CONFIDENCE)
+
     final_answer = {
-        "summary": _build_summary(intent, verified),
+        "status": status,
+        "summary": summary,
         "key_facts": [
             {"text": c.text, "confidence": c.confidence, "supported": c.supported_by != []}
             for c in verified[:5]
@@ -188,7 +301,7 @@ def run_action_agent(state: dict) -> dict:
             }
             for a in pending_actions
         ],
-        "overall_confidence": _calc_confidence(verified, unsupported),
+        "overall_confidence": confidence,
     }
 
     return {

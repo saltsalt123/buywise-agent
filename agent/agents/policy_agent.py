@@ -4,10 +4,47 @@ Policy Agent - analyzes warranty, return, and refund policies.
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 from agent.state import AgentMessage, Claim, ClaimType, EvidenceChunk, PolicyDecision
 from ingestion.labels import get_label, merge_labels
+
+# Return and warranty windows are counted in calendar days as the customer experiences
+# them, i.e. Beijing time.  These are A-share-market-adjacent consumer policies written for
+# a China-based user, and `datetime.utcnow()` put the day boundary eight hours late: between
+# 00:00 and 08:00 Beijing the UTC date is still yesterday, so a window that had just closed
+# still read as open, and on the closing day the last valid day read as already past.
+BEIJING = ZoneInfo("Asia/Shanghai")
+
+# Phrases that refuse returns outright. A receipt that grants a return window while the
+# merchant's own policy refuses returns is a conflict, and the workflow has to surface it
+# rather than silently pick whichever document it read first — that is how a final-sale
+# order ends up with a drafted return request.
+_RETURN_REFUSAL_PATTERNS = (
+    "final sale",
+    "all sales final",
+    "no returns",
+    "no refunds",
+    "no exchanges",
+    "not accepted",
+    "non-returnable",
+    "nonreturnable",
+    "returns are not",
+    "return is not",
+)
+
+
+def policy_agent_now() -> datetime:
+    """Current time in Beijing. The clock seam: tests replace this, production calls it."""
+    return datetime.now(BEIJING)
+
+
+def _local_date(moment: datetime) -> date:
+    """The Beijing calendar date for a moment, naive values read as Beijing local time."""
+    if moment.tzinfo is None:
+        return moment.date()
+    return moment.astimezone(BEIJING).date()
 
 
 def parse_days(text: str) -> int | None:
@@ -125,7 +162,8 @@ def run_policy_agent(state: dict) -> dict:
     if purchase_date_str:
         try:
             purchase_date = datetime.strptime(purchase_date_str.split()[0], "%Y-%m-%d")
-            days_since = (datetime.utcnow() - purchase_date).days
+            # Beijing calendar days, not UTC: see policy_agent_now() above.
+            days_since = (_local_date(policy_agent_now()) - purchase_date.date()).days
 
             if decision.return_window_days:
                 decision.is_return_valid = days_since <= decision.return_window_days
@@ -216,6 +254,24 @@ def run_policy_agent(state: dict) -> dict:
                 text=f"Policy exceptions found: {', '.join(decision.exceptions[:3])}",
                 claim_type=ClaimType.POLICY_RULE,
                 confidence=0.7,
+            )
+        )
+
+    # A window in one document and a refusal in another is a conflict, not two facts to be
+    # ranked. Recorded as its own claim so downstream agents read a field rather than
+    # re-scanning the prose.
+    refusal_hits = [p for p in _RETURN_REFUSAL_PATTERNS if p in all_text]
+    if refusal_hits and decision.return_window_days:
+        claims.append(
+            Claim(
+                claim_id="policy_return_conflict",
+                text=(
+                    "Conflicting return terms: the receipt states a "
+                    f"{decision.return_window_days}-day return window, but the "
+                    f"merchant's policy refuses returns ({', '.join(refusal_hits[:3])})"
+                ),
+                claim_type=ClaimType.RISK,
+                confidence=0.9,
             )
         )
 

@@ -200,6 +200,11 @@ class BuyWiseState(TypedDict):
     # Optional extra fields for agents
     product_facts: Any | None
 
+    # Per-run retrieval index. Deliberately part of the state rather than a module global:
+    # a process-wide retriever let one request's corpus be searched by another request
+    # (see tests/test_retriever_isolation.py).
+    retriever: Any | None
+
 
 # ── Async Task ──────────────────────────────────────────────────────────────
 
