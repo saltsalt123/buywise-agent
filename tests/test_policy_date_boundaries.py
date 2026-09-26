@@ -124,19 +124,19 @@ class TestPurchaseDayAndBoundaries:
             monkeypatch, purchase, _at(last + timedelta(days=1), 0, 0)
         )
 
-    def test_a_zero_day_window_is_not_silently_ignored(self, monkeypatch) -> None:
-        """Known limitation, pinned so it cannot regress further.
+    def test_a_zero_day_window_is_recorded_and_refuses_the_return(self, monkeypatch) -> None:
+        """A "0 days" window is final sale stated in numbers, not a missing value.
 
-        A policy that states "0 days" (the numeric form of final sale) yields no return
-        verdict at all, because the policy agent guards on ``if decision.return_window_days:``
-        and ``0`` is falsy.  The warranty side is unaffected.  Asserted as-is rather than
-        fixed here: this round is bug defence for the listed defects, and changing it would
-        alter final-sale semantics. Recorded as a next-round candidate.
+        This test used to pin the opposite: the window claim was absent entirely because the
+        policy agent guarded on ``if decision.return_window_days:`` and ``0`` is falsy. Fixed
+        in the zero-day round — the window is now recorded as 0, the verdict is "expired", and
+        an explicit "returns unavailable" claim is published. The warranty is unaffected.
         """
         purchase = date(2026, 5, 15)
         ids = _verdict(monkeypatch, purchase, _at(purchase), window_days=0)
-        return_claims = {i for i in ids if i.startswith("policy_return")}
-        assert not return_claims, f"a 0-day window now produces a return verdict: {sorted(ids)}"
+        assert "policy_return_window" in ids, "the zero-day window was dropped again"
+        assert "policy_return_expired" in ids, "a zero-day window left the return open"
+        assert "policy_return_unavailable" in ids
         assert "policy_warranty_valid" in ids, "the warranty decision is unaffected"
 
 

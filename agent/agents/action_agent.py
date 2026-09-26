@@ -24,8 +24,10 @@ CONFLICT_STATUS = "needs_human_review"
 
 # Claim ids that carry a decision rather than a document fact.
 RETURN_CONFLICT_CLAIM_ID = "policy_return_conflict"
+RETURN_UNAVAILABLE_CLAIM_ID = "policy_return_unavailable"
 
-# Contradictory documents cannot support a confident answer, whatever the claim ratio says.
+# Contradictory or unavailable return terms cannot support a confident answer, whatever the
+# claim ratio says.
 _MAX_CONFLICT_CONFIDENCE = 0.5
 
 _NO_EVIDENCE_SUMMARY = (
@@ -49,6 +51,15 @@ _CONFLICT_SUMMARY = (
 )
 
 
+_UNAVAILABLE_SUMMARY = (
+    "Returns are not available for this order: the merchant's terms refuse a return "
+    "(final sale, non-returnable, or a zero-day window), so there is no standard return to "
+    "file. The only route is to ask the merchant for an exception, or to rely on the "
+    "warranty if the fault is covered. This does not need a decision from you first, but a "
+    "human should approve the message before it is sent."
+)
+
+
 def _evidence_claims(claims: list[Claim]) -> list[Claim]:
     """Drop claims that describe routing rather than the documents."""
     return [c for c in claims if c.claim_id not in INTENT_CLAIM_IDS]
@@ -58,6 +69,10 @@ def _has_return_conflict(claims: list[Claim]) -> bool:
     """True when the documents contradict each other about returns."""
     return any(c.claim_id == RETURN_CONFLICT_CLAIM_ID for c in claims)
 
+
+def _returns_not_available(claims: list[Claim]) -> bool:
+    """True when the merchant's terms refuse a return outright."""
+    return any(c.claim_id == RETURN_UNAVAILABLE_CLAIM_ID for c in claims)
 
 
 def run_action_agent(state: dict) -> dict:
@@ -70,6 +85,7 @@ def run_action_agent(state: dict) -> dict:
     pending_actions: list[PendingAction] = []
     # Only the warranty/return branch can detect a return conflict; other intents never do.
     conflict = False
+    unavailable = False
 
     if "warranty" in intent or "return" in intent:
         # Generate warranty/return recommendation. A warranty the policy agent has already
@@ -87,6 +103,7 @@ def run_action_agent(state: dict) -> dict:
         # "closed" apart from "unknown".
         return_verdict = _return_verdict(verified)
         conflict = _has_return_conflict(verified)
+        unavailable = _returns_not_available(verified)
         has_return = (
             return_verdict
             if return_verdict is not None
@@ -142,6 +159,37 @@ def run_action_agent(state: dict) -> dict:
                         ),
                         "include_order_number": True,
                         "reason": "conflicting_return_terms",
+                    },
+                    requires_approval=False,
+                )
+            )
+        elif unavailable:
+            # The merchant's terms refuse a return outright (final sale, non-returnable, or a
+            # zero-day window). There is no standard return to file, so the only honest
+            # action is to ask for an exception — never a plain return request.
+            pending_actions.append(
+                PendingAction(
+                    action_id="act_return_exception_request",
+                    action_type="draft_email",
+                    description=(
+                        "Draft an exception request — the merchant's terms do not allow a "
+                        "return on this order, so ask whether an exception is possible"
+                    ),
+                    payload={
+                        "subject": "Request for a return exception on my order",
+                        "body": (
+                            "To Whom It May Concern,\n\n"
+                            "I would like to ask whether an exception can be made to your "
+                            "return terms for my order. I understand the order was sold as "
+                            "final sale and that returns are not normally accepted.\n\n"
+                            "If an exception is not possible, could you confirm whether any "
+                            "warranty or repair route applies?\n\n"
+                            "[Order details]\n\n"
+                            "Thank you,\n"
+                            "[Your Name]"
+                        ),
+                        "include_order_number": True,
+                        "reason": "return_not_available",
                     },
                     requires_approval=False,
                 )
@@ -260,24 +308,28 @@ def run_action_agent(state: dict) -> dict:
     # "no evidence" there would be wrong. Only an explicitly empty document set means none
     # was found.
     documents_supplied = "retrieved_evidence" in state
+    needs_review = conflict or unavailable
     if documents_supplied and not documents:
         status = NO_EVIDENCE_STATUS
         summary = _NO_EVIDENCE_SUMMARY
     elif documents_supplied and not verified:
         status = INSUFFICIENT_EVIDENCE_STATUS
         summary = _UNVERIFIED_EVIDENCE_SUMMARY
-    elif conflict:
-        # Documents that contradict each other cannot be reported as a finished analysis.
+    elif needs_review:
+        # Either the documents contradict each other, or the terms refuse a return outright.
+        # Neither can be reported as a finished analysis, and neither may end in a plain
+        # return request.
         status = CONFLICT_STATUS
-        summary = _CONFLICT_SUMMARY
+        summary = _CONFLICT_SUMMARY if conflict else _UNAVAILABLE_SUMMARY
     else:
         status = "complete"
         summary = _build_summary(intent, verified)
 
     confidence = _calc_confidence(verified, unsupported)
-    if conflict:
+    if needs_review:
         # The claim ratio can read 1.0 here — every claim is individually well-supported —
-        # which is exactly the wrong message when the sources disagree with each other.
+        # which is exactly the wrong message when the sources disagree, or when the return
+        # the user asked for does not exist.
         confidence = min(confidence, _MAX_CONFLICT_CONFIDENCE)
 
     final_answer = {

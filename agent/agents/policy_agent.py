@@ -22,16 +22,32 @@ BEIJING = ZoneInfo("Asia/Shanghai")
 # rather than silently pick whichever document it read first — that is how a final-sale
 # order ends up with a drafted return request.
 _RETURN_REFUSAL_PATTERNS = (
+    # plain refusals
     "final sale",
+    "sales are final",
     "all sales final",
     "no returns",
     "no refunds",
     "no exchanges",
     "not accepted",
-    "non-returnable",
-    "nonreturnable",
     "returns are not",
     "return is not",
+    # eligibility refusals
+    "non-returnable",
+    "nonreturnable",
+    "not returnable",
+    "not eligible for return",
+    "cannot be returned",
+    "cannot be refunded",
+    "ineligible for return",
+    # refusals that only offer an exchange, or nothing at all
+    "exchange only",
+    "exchange-only",
+    "exchange or store credit",
+    "refunds are unavailable",
+    "refund is unavailable",
+    "returns are unavailable",
+    "refund unavailable",
 )
 
 
@@ -104,6 +120,11 @@ def run_policy_agent(state: dict) -> dict:
             r"return\s*(?:within|policy|window|period)[:\s]*(\d+)\s*[- ]?\s*(?:day|days)",
             all_text,
         )
+        if return_match is None:
+            # A hyphenated lead-in, e.g. "0-day return window".
+            return_match = re.search(
+                r"(\d+)\s*[- ]\s*days?\s+return\s+window", all_text
+            )
         if return_match:
             decision.return_window_days = int(return_match.group(1))
             # A parsed return window is evidence of a real policy read; without this the
@@ -165,8 +186,14 @@ def run_policy_agent(state: dict) -> dict:
             # Beijing calendar days, not UTC: see policy_agent_now() above.
             days_since = (_local_date(policy_agent_now()) - purchase_date.date()).days
 
-            if decision.return_window_days:
-                decision.is_return_valid = days_since <= decision.return_window_days
+            if decision.return_window_days is not None:
+                if decision.return_window_days == 0:
+                    # "0 days" is final sale stated in numbers: the window never opened. It is
+                    # a decision, not an absent value, so the verdict is False rather than
+                    # "undetermined".
+                    decision.is_return_valid = False
+                else:
+                    decision.is_return_valid = days_since <= decision.return_window_days
 
             # Warranty is typically longer than return window, and is decided independently:
             # a policy can state a warranty period without stating a return window, in which
@@ -179,7 +206,7 @@ def run_policy_agent(state: dict) -> dict:
             pass
 
     claims = []
-    if decision.return_window_days:
+    if decision.return_window_days is not None:
         if decision.is_return_valid is None:
             status = "undetermined"  # a missing purchase date is not the same as "past"
         elif decision.is_return_valid:
@@ -189,7 +216,11 @@ def run_policy_agent(state: dict) -> dict:
         claims.append(
             Claim(
                 claim_id="policy_return_window",
-                text=f"Return window: {decision.return_window_days} days ({status} window)",
+                text=(
+                    f"Return window: {decision.return_window_days} days ({status} window)"
+                    if decision.return_window_days
+                    else "Return window: 0 days (final sale - no return window)"
+                ),
                 claim_type=ClaimType.POLICY_RULE,
                 confidence=decision.confidence,
                 uncertainty=(
@@ -258,10 +289,11 @@ def run_policy_agent(state: dict) -> dict:
         )
 
     # A window in one document and a refusal in another is a conflict, not two facts to be
-    # ranked. Recorded as its own claim so downstream agents read a field rather than
-    # re-scanning the prose.
+    # ranked. A refusal on its own (or a zero-day window) is simply "returns are not
+    # available". Either way it is recorded as its own claim so downstream agents read a
+    # field rather than re-scanning the prose.
     refusal_hits = [p for p in _RETURN_REFUSAL_PATTERNS if p in all_text]
-    if refusal_hits and decision.return_window_days:
+    if refusal_hits and decision.return_window_days is not None:
         claims.append(
             Claim(
                 claim_id="policy_return_conflict",
@@ -272,6 +304,22 @@ def run_policy_agent(state: dict) -> dict:
                 ),
                 claim_type=ClaimType.RISK,
                 confidence=0.9,
+                uncertainty="The documents disagree about whether a return is possible",
+            )
+        )
+    elif refusal_hits or decision.return_window_days == 0:
+        reason = (
+            ", ".join(refusal_hits[:3])
+            if refusal_hits
+            else "the stated return window is 0 days"
+        )
+        claims.append(
+            Claim(
+                claim_id="policy_return_unavailable",
+                text=f"Returns are not available for this order ({reason})",
+                claim_type=ClaimType.RISK,
+                confidence=0.9,
+                uncertainty="No self-service return path exists for this order",
             )
         )
 
