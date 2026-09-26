@@ -259,9 +259,9 @@ buywise-agent/
 │   └── ui/             # Streamlit UI (uploads.py holds the path rules, no streamlit import)
 ├── eval/               # Eval suite (2 positive cases x 4 metrics + 5 negative cases)
 ├── tests/              # Pytest suite (417 tests)
-├── sample_data/        # 3 synthetic demo cases
+├── sample_data/        # 2 populated synthetic cases + 1 empty fixture directory
 ├── scripts/demo.py     # CLI demo runner
-├── docker-compose.yml  # API + PostgreSQL + Redis (no web UI / worker — see Roadmap)
+├── docker-compose.yml  # API + PostgreSQL + Redis (Streamlit UI runs separately via make ui)
 └── Makefile
 ```
 
@@ -278,7 +278,7 @@ buywise-agent/
   unimplemented; that is what would handle paraphrase and synonyms.
 - **Phase 5**: Price monitor + deadline watch agents → proactive alerts
 - **Phase 6**: Async workers (Celery) + review summarization agent
-- **Phase 7**: Web UI (Streamlit/Next.js) + real EML/PDF upload
+- **Phase 7**: richer web UI / Next.js polish; minimal Streamlit upload UI has shipped in apps/ui/
 - **Phase 8**: Replace the keyword-based intent classifier with an LLM/embedding
   classifier. Substring matching cannot generalise — every inflection whose stem is
   respelled (`charging`, `broke`, `warranties`, `stopped working`) has to be listed by
