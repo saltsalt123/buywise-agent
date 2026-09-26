@@ -9,7 +9,6 @@ from pathlib import Path
 from bs4 import BeautifulSoup, Comment
 
 from agent.state import (
-    DocType,
     EvidenceChunk,
     ParsedObject,
     ParsedObjectType,
@@ -17,6 +16,7 @@ from agent.state import (
     hash_content,
     make_chunk_id,
 )
+from ingestion.doc_type import infer_doc_type
 from ingestion.labels import extract_labels
 
 # Tags to remove as boilerplate
@@ -85,16 +85,12 @@ def parse_html(
     path = Path(file_path)
     raw_bytes = path.read_bytes()
     file_hash = hash_content(raw_bytes)
-    name_lower = path.stem.lower()
 
-    if "policy" in name_lower or "return" in name_lower:
-        doc_type = DocType.POLICY
-    elif "product" in name_lower or "page" in name_lower:
-        doc_type = DocType.PRODUCT_PAGE
-    elif "review" in name_lower:
-        doc_type = DocType.REVIEWS
-    else:
-        doc_type = DocType.PRODUCT_PAGE
+    # The text is cleaned before the doc_type is decided so the shared inference can consult
+    # the body when the filename says nothing (see ingestion/doc_type.py).
+    raw_html = raw_bytes.decode("utf-8", errors="replace")
+    clean_text = clean_html(raw_html)
+    doc_type = infer_doc_type(path, clean_text)
 
     source = SourceDocument(
         source_id=f"src_{file_hash[:12]}",
@@ -105,9 +101,6 @@ def parse_html(
         created_at=datetime.fromtimestamp(path.stat().st_mtime),
         metadata={"file_path": str(path)},
     )
-
-    raw_html = raw_bytes.decode("utf-8", errors="replace")
-    clean_text = clean_html(raw_html)
 
     chunks: list[EvidenceChunk] = []
     parsed_objects: list[ParsedObject] = []

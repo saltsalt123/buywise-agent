@@ -17,6 +17,7 @@ from agent.state import (
     hash_content,
     make_chunk_id,
 )
+from ingestion.doc_type import infer_doc_type
 
 
 def parse_csv(
@@ -27,18 +28,14 @@ def parse_csv(
     file_hash = hash_content(raw_bytes)
     name_lower = path.stem.lower()
 
-    # Infer type
-    if "review" in name_lower or "comment" in name_lower:
-        doc_type = DocType.REVIEWS
+    # doc_type comes from the shared inference (see ingestion/doc_type.py) so the rules live
+    # in one place. object_type is specific to this parser and stays here.
+    doc_type = infer_doc_type(path, "")
+    if doc_type == DocType.REVIEWS:
         object_type = ParsedObjectType.REVIEW_ISSUE
-    elif "bank" in name_lower or "transaction" in name_lower or "流水" in name_lower:
-        doc_type = DocType.BANK_CSV
-        object_type = ParsedObjectType.TRANSACTION
-    elif "price" in name_lower or "history" in name_lower:
-        doc_type = DocType.BANK_CSV
+    elif any(k in name_lower for k in ("bank", "transaction", "流水", "price", "history")):
         object_type = ParsedObjectType.TRANSACTION
     else:
-        doc_type = DocType.BANK_CSV
         object_type = ParsedObjectType.ORDER
 
     source = SourceDocument(

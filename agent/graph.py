@@ -96,18 +96,20 @@ def _parse_one_file(path: str, seen: set[str]) -> list[EvidenceChunk]:
         elif ext in (".html", ".htm"):
             src, chunks, _ = parse_html(path)
         elif ext == ".txt":
-            # Treat .txt as a simple text source
+            # Treat .txt as a simple text source.
+            #
+            # The body is decoded *before* the doc_type is decided. It used to be the other
+            # way round, with the type derived from the filename alone and .txt defaulting to
+            # `manual` — and `policy_agent` only reads {warranty, policy, receipt}, so a
+            # plain-text return policy was dropped from every decision without a word.
             from datetime import datetime
 
-            from agent.state import DocType, SourceDocument, make_chunk_id
+            from agent.state import SourceDocument, make_chunk_id
+            from ingestion.doc_type import infer_doc_type
             from ingestion.labels import extract_labels
 
-            name = p.stem.lower()
-            doc_type = (
-                DocType.RECEIPT if "receipt" in name
-                else DocType.WARRANTY if "warranty" in name
-                else DocType.MANUAL
-            )
+            text = raw.decode("utf-8", errors="replace")
+            doc_type = infer_doc_type(p, text)
             src = SourceDocument(
                 source_id=f"src_{fh[:12]}",
                 user_id="default",
@@ -117,7 +119,6 @@ def _parse_one_file(path: str, seen: set[str]) -> list[EvidenceChunk]:
                 created_at=datetime.fromtimestamp(p.stat().st_mtime),
                 metadata={"file_path": path},
             )
-            text = raw.decode("utf-8", errors="replace")
             paras = [x.strip() for x in text.split("\n\n") if x.strip()]
             chunks = [
                 EvidenceChunk(

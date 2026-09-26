@@ -19,7 +19,13 @@ SAMPLE = Path("sample_data")
 
 
 def _sample_files() -> list[Path]:
-    return sorted(path for path in SAMPLE.rglob("*") if path.is_file())
+    # Dotfiles are placeholders, not data: `.gitkeep` is what keeps an intentionally empty
+    # fixture directory present in a clone, and it carries nothing to parse.
+    return sorted(
+        path
+        for path in SAMPLE.rglob("*")
+        if path.is_file() and not path.name.startswith(".")
+    )
 
 
 def test_there_are_sample_files_to_check():
@@ -36,6 +42,22 @@ def test_every_sample_file_produces_chunks():
 # Directories that intentionally carry no data. Listing them explicitly keeps the test above
 # honest: a fixture that silently empties out is a failure, not a quieter version of passing.
 EMPTY_FIXTURE_DIRS = {"monitor_price_drop_case"}
+
+
+def test_empty_fixture_directories_survive_a_clone():
+    """An empty directory is invisible to git unless something inside it is tracked.
+
+    `monitor_price_drop_case` is asserted to be empty above, so without a placeholder the
+    directory exists only on the machine where it was created and the assertion quietly stops
+    running anywhere else.
+    """
+    for name in sorted(EMPTY_FIXTURE_DIRS):
+        directory = SAMPLE / name
+        assert directory.is_dir(), f"{name}/ is missing entirely"
+        tracked_placeholder = [p for p in directory.iterdir() if p.name.startswith(".")]
+        assert tracked_placeholder, (
+            f"{name}/ has no placeholder file, so git cannot keep the directory in a clone"
+        )
 
 
 def test_every_sample_directory_produces_chunks():

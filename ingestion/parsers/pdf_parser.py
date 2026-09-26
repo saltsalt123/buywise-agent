@@ -8,7 +8,8 @@ from pathlib import Path
 
 import pdfplumber
 
-from agent.state import DocType, EvidenceChunk, SourceDocument, hash_content, make_chunk_id
+from agent.state import EvidenceChunk, SourceDocument, hash_content, make_chunk_id
+from ingestion.doc_type import infer_doc_type
 
 
 def parse_pdf(
@@ -19,18 +20,12 @@ def parse_pdf(
     raw_bytes = path.read_bytes()
     file_hash = hash_content(raw_bytes)
 
-    # Infer doc type from filename keywords
-    name_lower = path.stem.lower()
-    if "warranty" in name_lower:
-        doc_type = DocType.WARRANTY
-    elif "receipt" in name_lower or "order" in name_lower:
-        doc_type = DocType.RECEIPT
-    elif "manual" in name_lower or "guide" in name_lower:
-        doc_type = DocType.MANUAL
-    elif "policy" in name_lower or "return" in name_lower:
-        doc_type = DocType.POLICY
-    else:
-        doc_type = DocType.MANUAL
+    # Page text is read before the doc_type is decided so the shared inference can consult
+    # the body when the filename says nothing (see ingestion/doc_type.py).
+    with pdfplumber.open(path) as pdf:
+        page_texts = [page.extract_text() or "" for page in pdf.pages]
+
+    doc_type = infer_doc_type(path, "\n".join(page_texts))
 
     source = SourceDocument(
         source_id=f"src_{file_hash[:12]}",
@@ -39,27 +34,23 @@ def parse_pdf(
         doc_type=doc_type,
         title=path.name,
         created_at=datetime.fromtimestamp(path.stat().st_mtime),
-        metadata={"file_path": str(path), "pages": 0},
+        metadata={"file_path": str(path), "pages": len(page_texts)},
     )
 
     chunks: list[EvidenceChunk] = []
 
-    with pdfplumber.open(path) as pdf:
-        source.metadata["pages"] = len(pdf.pages)
-        for page_num, page in enumerate(pdf.pages, start=1):
-            text = page.extract_text() or ""
-
-            # Split long pages into paragraph-level chunks
-            paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
-            for i, para in enumerate(paragraphs):
-                chunk = EvidenceChunk(
-                    chunk_id=make_chunk_id(source.source_id, page_num, None, i),
-                    source_id=source.source_id,
-                    text=para,
-                    page=page_num,
-                    metadata={"doc_type": doc_type.value},
-                )
-                chunks.append(chunk)
+    for page_num, text in enumerate(page_texts, start=1):
+        # Split long pages into paragraph-level chunks
+        paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+        for i, para in enumerate(paragraphs):
+            chunk = EvidenceChunk(
+                chunk_id=make_chunk_id(source.source_id, page_num, None, i),
+                source_id=source.source_id,
+                text=para,
+                page=page_num,
+                metadata={"doc_type": doc_type.value},
+            )
+            chunks.append(chunk)
 
     source.metadata["chunk_count"] = len(chunks)
     return source, chunks
