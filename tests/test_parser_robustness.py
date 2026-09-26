@@ -17,13 +17,15 @@ import logging
 from pathlib import Path
 
 import pytest
+from reportlab.pdfgen import canvas
 
 from agent.graph import _load_sample_data, run_workflow
 
-pytest.importorskip("pdfplumber")
-pytest.importorskip("reportlab")
-
-from reportlab.pdfgen import canvas  # noqa: E402  (import after the availability check)
+# reportlab is a hard import, deliberately not importorskip: a module-level `importorskip`
+# turns a missing dependency into a single silent skip for the whole file — which is how this
+# suite stopped running on a fresh install. reportlab was never declared as a dependency, so
+# the 14 tests below vanished with nothing but "1 skipped" to show for it. It is now in the
+# `dev` extra, and a missing dep fails loudly.
 
 RECEIPT_TXT = (
     "TECHWORLD INC. - SALES RECEIPT\n"

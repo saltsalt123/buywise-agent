@@ -56,6 +56,10 @@ dev = [
     "ruff>=0.3.0",
     "mypy>=1.0.0",
     "pre-commit>=3.0.0",
+    # Test-only: tests/test_parser_robustness.py generates a real PDF fixture. Declared here
+    # so a fresh `pip install -e ".[dev]"` can run that suite; without it the module's
+    # top-level importorskip turns the whole file into one silent skip.
+    "reportlab>=4.0.0",
 ]
 
 [tool.setuptools.packages.find]
