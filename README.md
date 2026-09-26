@@ -14,6 +14,8 @@
 
 **A LangGraph multi-agent RAG assistant for warranty/return decisions — local-first, demo-ready.**
 
+> **Version status.** `v0.1.0` is the backend warranty/return MVP. Current `main` adds the local Streamlit UI via `make ui`.
+
 ---
 
 ## 🎯 What It Does
@@ -93,6 +95,10 @@ Two things worth knowing:
 - Everything runs in-process against the local workflow. No external APIs, no account, no
   telemetry — `.streamlit/config.toml` turns usage reporting off so the first run does not
   prompt for an email address.
+
+![BuyWise Agent Streamlit UI](assets/buywise-streamlit-ui.png)
+
+*`make ui` — upload your own documents or load a bundled sample case, then read the analysis.*
 
 ## 📸 Demo Output
 
